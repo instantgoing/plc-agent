@@ -1,0 +1,14 @@
+[
+  {
+    "inputs": {"Start": false, "Stop": false},
+    "expected": {"Motor": false}
+  },
+  {
+    "inputs": {"Start": true, "Stop": false},
+    "expected": {"Motor": true}
+  },
+  {
+    "inputs": {"Start": true, "Stop": true},
+    "expected": {"Motor": false}
+  }
+]

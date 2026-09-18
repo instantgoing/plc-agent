@@ -1,0 +1,29 @@
+name: plc-agent-m2
+services:
+  openplc-runtime:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.m2
+    image: plc-agent-openplc:m2
+    container_name: plc-agent-openplc-m2
+    ports:
+      - "8443:8443"
+    cap_add:
+      - SYS_NICE
+      - SYS_RESOURCE
+    volumes:
+      - openplc-runtime-data:/var/run/runtime
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          code=$$(curl -k -s -o /dev/null -w '%{http_code}' https://localhost:8443/api/status);
+          echo "$$code" | grep -qE '^(200|401)$$'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  openplc-runtime-data:

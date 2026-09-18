@@ -1,0 +1,7 @@
+PROGRAM Main
+VAR_OUTPUT
+    Motor : BOOL;
+END_VAR
+
+Motor := ;
+END_PROGRAM

@@ -1,0 +1,14 @@
+PROGRAM Main
+VAR
+    Heartbeat AT %QX0.0 : BOOL;
+END_VAR
+
+Heartbeat := NOT Heartbeat;
+END_PROGRAM
+
+CONFIGURATION Config0
+    RESOURCE Res0 ON PLC
+        TASK MainTask(INTERVAL := T#100ms, PRIORITY := 0);
+        PROGRAM Inst0 WITH MainTask : Main;
+    END_RESOURCE
+END_CONFIGURATION

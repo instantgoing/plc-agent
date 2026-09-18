@@ -1,0 +1,6 @@
+{
+  "name": "motor_start_stop",
+  "inputs": ["Start", "Stop"],
+  "outputs": ["Motor"],
+  "language": "iec-61131-3-structured-text"
+}

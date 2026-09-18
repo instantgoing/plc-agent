@@ -1,0 +1,22 @@
+# M1 only: a small real MatIEC compiler image.
+# OpenPLC Runtime is intentionally added in M2 after this compiler boundary is
+# verified; this image is not a runtime simulator.
+# `python:3.12-slim` is also a normal Debian base and is already available in
+# the development machine's Docker cache. Keeping M1 on a cached base avoids
+# making the first compiler smoke test depend on Docker Hub authentication.
+FROM --platform=linux/amd64 python:3.12-slim
+
+ARG MATIEC_VERSION=v4.0.11
+ARG MATIEC_SHA256=6f1d99dd0846a2243f130d70a1d0393cf884bb7a747022d6ef14ac9f5312bd0c
+
+RUN mkdir -p /tmp/matiec /usr/local/share/matiec \
+    && python -c "import urllib.request; urllib.request.urlretrieve('https://github.com/Autonomy-Logic/matiec/releases/download/${MATIEC_VERSION}/matiec-linux-x64.tar.gz', '/tmp/matiec.tar.gz')" \
+    && echo "${MATIEC_SHA256}  /tmp/matiec.tar.gz" | sha256sum -c - \
+    && tar xzf /tmp/matiec.tar.gz -C /tmp/matiec --strip-components=1 \
+    && install -m 0755 /tmp/matiec/iec2c /usr/local/bin/iec2c \
+    && install -m 0755 /tmp/matiec/iec2iec /usr/local/bin/iec2iec \
+    && cp -r /tmp/matiec/lib /usr/local/share/matiec/lib \
+    && rm -rf /tmp/matiec
+
+WORKDIR /output
+CMD ["iec2c"]

@@ -1,0 +1,7 @@
+name: plc-agent-m1
+services:
+  matiec:
+    build:
+      context: .
+      dockerfile: Dockerfile.m1
+    image: plc-agent-matiec:m1

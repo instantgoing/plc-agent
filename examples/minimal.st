@@ -1,0 +1,10 @@
+PROGRAM Main
+VAR_INPUT
+    Start : BOOL;
+END_VAR
+VAR_OUTPUT
+    Motor : BOOL;
+END_VAR
+
+Motor := Start;
+END_PROGRAM
