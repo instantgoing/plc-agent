@@ -1,7 +1,7 @@
 # Minimal architecture
 
 ```text
-CLI / future Agent
+CLI / M5 Agent
         |
         v
 plc_tools stable contracts
@@ -14,9 +14,12 @@ runtime adapters (MatIEC + Docker/OpenPLC)
 
 ### Agent
 
-The Agent will receive a natural-language requirement, decide the I/O and
-state model, generate ST, and run a bounded repair loop. It will only call
-`plc_tools`; it will not know Docker, REST endpoints, or compiler flags.
+The M5 Agent receives a natural-language requirement, uses the vendored
+`smolagents.ToolCallingAgent` variant to submit complete ST plus a behavior
+plan, and runs a bounded repair loop. It exposes only a serial candidate
+evaluation tool to the model. It only calls `plc_tools`; it does not know
+Docker, REST endpoints, Socket.IO, or compiler flags, and it cannot execute
+arbitrary Python or shell code.
 
 ### PLC Tools
 
@@ -52,3 +55,8 @@ OpenPLC base and was verified through upload, Runtime GCC/link, and a stable
 compile never implies that outputs behave correctly. `plc_verify` executes the
 program, changes inputs, waits for real scans, observes outputs, reports
 expected versus actual values, and releases forces after every plan.
+
+M5 accepts a candidate only after the same pipeline has passed real MatIEC
+checking, Runtime compilation, Runtime startup, and `plc_verify` behavior
+assertions. The candidate evaluation count is bounded (three by default), and
+the runtime is stopped in cleanup after each candidate evaluation.

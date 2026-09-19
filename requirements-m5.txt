@@ -1,0 +1,4 @@
+# Install the repository-local smolagents fork and the real OpenAI-compatible
+# model dependency for M5. The API key is supplied through the environment.
+-e ./smolagents
+openai>=1.58.1

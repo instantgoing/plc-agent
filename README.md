@@ -126,9 +126,47 @@ expected-versus-actual failures, and releases every forced input in `finally`.
   2026-09-18.
 - M4: complete. The three-case `problem_001/tests.json` plan passed against the
   real Runtime on 2026-09-18, including automatic force cleanup.
-- M5-M7: not started. M5 requires a real supported LLM API credential; no model
-  credential is present in the current environment, so no mock completion is
-  claimed.
+- M5: implementation present, but real LLM + real Runtime acceptance is still
+  pending. No model credential is present in the current environment, so no M5
+  completion is claimed.
+- M6-M7: not started.
 
 M4 now proves behavior only for the explicit tested cases. Compilation or
 runtime startup alone still never implies program correctness.
+
+## M5 single-Agent bounded repair loop
+
+M5 adds a PLC-specific variant of the vendored `smolagents.ToolCallingAgent`.
+The Agent receives a natural-language requirement, submits a complete
+Structured Text candidate plus a behavior plan, and can repair the candidate at
+most three times. Every candidate goes through the stable `plc_tools` boundary:
+real MatIEC checking, real Runtime compilation, real scan-cycle execution, and
+`plc_verify` behavior assertions. A compiler pass or an LLM explanation alone
+never counts as success.
+
+Install the M5 model dependency from the repository root:
+
+```powershell
+python -m pip install -r requirements-m5.txt
+```
+
+Configure a real OpenAI-compatible tool-calling model without committing the
+credential:
+
+```powershell
+$env:PLC_AGENT_MODEL_ID = "your-model-id"
+$env:PLC_AGENT_API_KEY = "your-api-key"
+$env:PLC_AGENT_API_BASE = "https://your-provider.example/v1" # optional
+```
+
+Run the bounded Agent through the CLI:
+
+```powershell
+python main.py agent "当 Start 为真且 Stop 为假时启动 Motor，Stop 为真时关闭 Motor"
+```
+
+The real LLM and real OpenPLC acceptance test is opt-in and requires
+`PLC_AGENT_INTEGRATION=1` together with `PLC_OPENPLC_INTEGRATION=1`. Without a
+real model credential, M5 may run contract tests but must not be claimed as
+complete. See [docs/m5-plan.md](docs/m5-plan.md) for the full contract and
+acceptance rules.
