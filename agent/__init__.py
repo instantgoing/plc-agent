@@ -1,16 +1,27 @@
-"""M5 PLC Agent: a bounded, single-agent repair loop."""
+"""Codex-backed PLC Agent service; PLC tools remain independently callable."""
 
-from .contracts import AttemptRecord, M5Request, M5Result
-from .model import ModelConfigurationError, build_model, load_model_config
-from .plc_agent import PLCRepairAgent, PLCToolCallingAgent
+from importlib import import_module
 
-__all__ = [
-    "AttemptRecord",
-    "M5Request",
-    "M5Result",
-    "ModelConfigurationError",
-    "PLCRepairAgent",
-    "PLCToolCallingAgent",
-    "build_model",
-    "load_model_config",
-]
+from .codex_client import CodexClient, CodexInfrastructureError
+from .codex_session import CodexPLCSession, PLCTaskResult
+
+__all__ = ["CodexClient", "CodexInfrastructureError", "CodexPLCSession", "PLCTaskResult"]
+
+# Old test modules still exercise the previous Agent while the real Codex
+# acceptance gate is pending. Keep imports lazy so the CLI never loads it.
+_LEGACY = {
+    "AgentControlState": "contracts", "AttemptRecord": "contracts",
+    "M5Request": "contracts", "M5Result": "contracts",
+    "RequirementSpec": "contracts", "RunState": "contracts",
+    "ModelConfigurationError": "model", "build_model": "model",
+    "load_model_config": "model", "PLCRepairAgent": "plc_agent",
+    "PLCToolCallingAgent": "plc_agent", "PLCEvent": "events",
+    "SessionMetrics": "metrics", "PLCSession": "session",
+}
+
+
+def __getattr__(name: str):
+    module_name = _LEGACY.get(name)
+    if module_name is None:
+        raise AttributeError(name)
+    return getattr(import_module(f".{module_name}", __name__), name)

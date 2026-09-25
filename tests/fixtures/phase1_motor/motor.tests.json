@@ -1,0 +1,178 @@
+{
+  "steps": [
+    {
+      "inputs": {
+        "Start": false,
+        "Stop": true
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Reset with Stop"
+    },
+    {
+      "inputs": {
+        "Stop": false
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Idle"
+    },
+    {
+      "inputs": {
+        "Start": true
+      },
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 50,
+      "note": "Start immediate response"
+    },
+    {
+      "inputs": {
+        "Start": false
+      },
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 50,
+      "note": "Release Start retains running"
+    },
+    {
+      "inputs": {
+        "Stop": true
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Stop immediate response"
+    },
+    {
+      "inputs": {
+        "Start": true
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Stop dominates Start"
+    },
+    {
+      "inputs": {
+        "Stop": false
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Held Start cannot restart on Stop release"
+    },
+    {
+      "inputs": {
+        "Start": false
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Rearm Start"
+    },
+    {
+      "inputs": {
+        "Start": true
+      },
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 50,
+      "note": "Restart and begin full ten-second run"
+    },
+    {
+      "inputs": {},
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 6000,
+      "note": "Remains running during interval before ten-second timeout"
+    },
+    {
+      "inputs": {},
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 5000,
+      "note": "Stopped after cumulative wait exceeds ten seconds"
+    },
+    {
+      "inputs": {},
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 500,
+      "note": "Held Start does not retrigger after timeout"
+    },
+    {
+      "inputs": {
+        "Start": false
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Release Start after timeout"
+    },
+    {
+      "inputs": {
+        "Start": true
+      },
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 50,
+      "note": "Start again after timeout"
+    },
+    {
+      "inputs": {
+        "Start": false
+      },
+      "expect": {
+        "Motor": true
+      },
+      "settle_ms": 50,
+      "note": "Release Start maintains second run"
+    },
+    {
+      "inputs": {
+        "Stop": true
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Stop immediately ends the second run"
+    },
+    {
+      "inputs": {},
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Motor remains stopped while Stop is held"
+    },
+    {
+      "inputs": {
+        "Start": false,
+        "Stop": false
+      },
+      "expect": {
+        "Motor": false
+      },
+      "settle_ms": 50,
+      "note": "Leave both inputs low"
+    }
+  ]
+}

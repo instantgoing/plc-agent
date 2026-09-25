@@ -35,10 +35,13 @@ from smolagents.models import (  # type: ignore[no-redef]
     MessageRole,
     Model,
 )
+from smolagents.utils import AgentParsingError, AgentToolCallError  # type: ignore[no-redef]
 
 
 __all__ = [
     "AgentExecutionError",
+    "AgentParsingError",
+    "AgentToolCallError",
     "ChatMessage",
     "ChatMessageToolCall",
     "ChatMessageToolCallFunction",

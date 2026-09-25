@@ -19,6 +19,119 @@ from plc_tools import (
 from plc_tools.check import check_st
 
 
+def _collect_clarification(question: str, choices: list[str]) -> str | None:
+    """Return one terminal answer, or None when this invocation must remain non-interactive."""
+
+    if not sys.stdin.isatty():
+        return None
+    print("\n需要补充 PLC 需求后才能安全继续：")
+    print(question)
+    if choices:
+        print("\n可选答案：")
+        for index, choice in enumerate(choices, start=1):
+            print(f"  {index}. {choice}")
+    print("  C. 自定义填写")
+    while True:
+        answer = input("请选择编号，或输入 C 后填写（直接回车取消）：").strip()
+        if not answer:
+            return None
+        if answer.lower() == "c":
+            custom = input("请输入你的完整补充：").strip()
+            if custom:
+                return custom
+            print("自定义答案不能为空。")
+            continue
+        if answer.isdigit() and 1 <= int(answer) <= len(choices):
+            return choices[int(answer) - 1]
+        print("请输入列出的编号，或输入 C。")
+
+
+def _append_clarification(task: str, question: str, answer: str) -> str:
+    """Make the selected answer explicit input for the next bounded Agent run."""
+
+    return (
+        f"{task}\n\n"
+        "User clarification for the previously unresolved PLC requirement:\n"
+        f"Question: {question}\n"
+        f"Answer: {answer}"
+    )
+
+
+def _print_agent_result(result: object) -> None:
+    """Render a compact terminal report; complete machine data stays behind --json."""
+
+    success = bool(getattr(result, "success", False))
+    state = getattr(result, "state", None) or "unknown"
+    failure_kind = getattr(result, "failure_kind", None)
+    final_message = str(getattr(result, "final_message", ""))
+    model_final_message = getattr(result, "model_final_message", None)
+    attempts = list(getattr(result, "attempts", []) or [])
+    st_code = getattr(result, "st_code", None)
+    plan = getattr(result, "verification_plan", None)
+
+    print("\n=== PLC-Agent ===")
+    print(f"Result: {'verified by real PLC behavior' if success else 'not completed'}")
+    print(f"State: {state}")
+    if failure_kind:
+        print(f"Failure kind: {failure_kind}")
+    if final_message:
+        print(f"\nMessage:\n{final_message}")
+    if (
+        state != "needs_user_input"
+        and isinstance(model_final_message, str)
+        and model_final_message.strip()
+        and model_final_message != final_message
+    ):
+        print(f"\nModel response:\n{model_final_message.strip()}")
+    if attempts:
+        print(f"\nEvaluation attempts: {len(attempts)}")
+        for attempt in attempts:
+            number = getattr(attempt, "attempt", "?")
+            phase = getattr(attempt, "phase", "unknown")
+            accepted = getattr(attempt, "accepted", False)
+            print(f"  - Attempt {number}: {phase}{' (passed)' if accepted else ''}")
+    if st_code:
+        print("\n--- Structured Text ---")
+        print(st_code.rstrip())
+    if plan:
+        steps = plan.get("steps", []) if isinstance(plan, dict) else []
+        print(f"\nVerification plan: {len(steps)} assertions (use --json for details)")
+
+
+def _print_agent_invalid_request(payload: dict[str, object], *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    print("\n=== PLC-Agent ===")
+    print("Result: invalid request")
+    print(f"Message: {payload['final_message']}")
+
+
+def _write_verified_artifacts(result: object, output: Path, *, overwrite: bool) -> tuple[Path, Path]:
+    """Persist only an accepted candidate and its matching behavior plan."""
+
+    if not bool(getattr(result, "success", False)):
+        raise ValueError("refusing to write artifacts because real PLC behavior verification did not pass")
+    st_code = getattr(result, "st_code", None)
+    verification_plan = getattr(result, "verification_plan", None)
+    if not isinstance(st_code, str) or not st_code.strip() or not isinstance(verification_plan, dict):
+        raise ValueError("accepted result has no complete ST program and verification plan")
+    if output.suffix.lower() != ".st":
+        raise ValueError("--output must name a .st file")
+    if not output.parent.is_dir():
+        raise ValueError(f"output directory does not exist: {output.parent}")
+
+    plan_path = output.with_suffix(".tests.json")
+    existing = [path for path in (output, plan_path) if path.exists()]
+    if existing and not overwrite:
+        names = ", ".join(str(path) for path in existing)
+        raise FileExistsError(f"refusing to overwrite existing artifact(s): {names}; pass --overwrite")
+
+    output.write_text(st_code.rstrip() + "\n", encoding="utf-8")
+    plan_path.write_text(json.dumps(verification_plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return output, plan_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="plc-agent")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -51,58 +164,36 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("plan", type=Path)
 
     agent_parser = subparsers.add_parser(
-        "agent", help="generate, repair, and behavior-verify ST with the M5 Agent"
+        "agent", help="run one Codex turn in a PLC workspace"
     )
     agent_parser.add_argument("task", nargs="?", help="natural-language PLC requirement")
+    agent_parser.add_argument("--workspace", type=Path, default=Path.cwd())
     agent_parser.add_argument("--requirement-file", type=Path)
-    agent_parser.add_argument("--max-attempts", type=int, choices=range(1, 4), default=3)
-    agent_parser.add_argument("--provider")
-    agent_parser.add_argument("--model-id")
-    agent_parser.add_argument("--api-base")
-    agent_parser.add_argument("--json", action="store_true", help="kept for CLI symmetry; output is always JSON")
+    agent_parser.add_argument("--max-attempts", type=int, default=5)
+    agent_parser.add_argument("--max-actions", type=int, default=40)
+    agent_parser.add_argument(
+        "--json", action="store_true",
+        help="emit one JSON result without prompting, for scripts and CI",
+    )
+
+    chat_parser = subparsers.add_parser(
+        "chat", help="continue a persistent Codex PLC conversation with live progress"
+    )
+    chat_parser.add_argument("task", nargs="?", help="optional first PLC requirement")
+    chat_parser.add_argument("--workspace", type=Path, default=Path.cwd())
+    chat_parser.add_argument("--max-attempts", type=int, default=5)
+    chat_parser.add_argument("--max-actions", type=int, default=40)
 
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.command == "agent":
-        from agent import M5Request, PLCRepairAgent
-
-        if bool(args.task) == bool(args.requirement_file):
-            payload = {
-                "success": False,
-                "failure_kind": "invalid_request",
-                "final_message": "provide exactly one of task or --requirement-file",
-                "attempts": [],
-            }
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-            return 2
-        if args.requirement_file:
-            try:
-                task = args.requirement_file.read_text(encoding="utf-8")
-            except (OSError, UnicodeError) as exc:
-                payload = {
-                    "success": False,
-                    "failure_kind": "invalid_request",
-                    "final_message": f"cannot read requirement file: {exc}",
-                    "attempts": [],
-                }
-                print(json.dumps(payload, ensure_ascii=False, indent=2))
-                return 2
-        else:
-            task = args.task
-        result = PLCRepairAgent(
-            provider=args.provider,
-            model_id=args.model_id,
-            api_base=args.api_base,
-        ).run(M5Request(task=task, max_attempts=args.max_attempts))
-        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
-        if result.success:
-            return 0
-        if result.failure_kind in {"invalid_request", "model_unavailable", "tool_unavailable", "runtime_busy"}:
-            return 2 if result.failure_kind == "invalid_request" else 3
-        return 1
+    from agent.env import load_project_env
+    load_project_env(Path(__file__).resolve().parent)
+    if args.command in {"agent", "chat"}:
+        from agent.codex_cli import run_command
+        return run_command(args)
     if args.command == "check":
         result = check_st(args.source)
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))

@@ -1,4 +1,3 @@
-# Install the repository-local smolagents fork and the real OpenAI-compatible
-# model dependency for M5. The API key is supplied through the environment.
--e ./smolagents
+# Legacy M5 model dependency; the active Codex entrypoint does not use it.
 openai>=1.58.1
+python-dotenv>=1.0.1

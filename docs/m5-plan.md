@@ -1,6 +1,7 @@
 # M5：基于 smolagents 变种的单 Agent 有界修复闭环方案
 
-状态：实现已落地；真实 LLM 端到端验收待模型凭据，尚未宣称 M5 完成。
+状态：M5 已完成。2026-09-20 使用真实 DeepSeek 工具调用模型及真实
+MatIEC/OpenPLC Runtime 完成端到端验收。
 
 编写依据：仓库当前的 M0-M4 实现、`docs/architecture.md`、`plc_tools/` 公开契约，以及仓库内 `smolagents` 源码（当前版本标记为 `1.27.0.dev0`）。
 
@@ -107,6 +108,7 @@ agent/
 task: str                         必填，自然语言 PLC 需求
 max_attempts: int = 3             候选评估上限，包含第一次生成
 source_filename: str = "candidate.st"
+max_actions: int = 8              模型动作上限，独立于候选评估次数
 ```
 
 约束：
@@ -161,6 +163,7 @@ verification_plan: object | null
 attempts: list[AttemptRecord]
 final_message: str
 model: {provider, model_id} | null
+state: str | null
 ```
 
 每条 `AttemptRecord` 至少包含：
@@ -190,6 +193,10 @@ accepted: bool
 ```text
 invalid_request
 model_unavailable
+model_authentication_failed
+model_connection_failed
+model_tool_unsupported
+model_context_exceeded
 model_output_invalid
 candidate_check_failed
 candidate_compile_failed
@@ -198,13 +205,16 @@ behavior_verification_failed
 unverifiable_requirement
 attempt_limit_reached
 runtime_busy
+agent_reported_failure
+action_limit_reached
 ```
 
 ## 5. Agent 工具设计
 
 ### 5.1 暴露给 LLM 的工具
 
-M5 对模型只暴露一个项目自定义工具和 smolagents 内置的最终回答工具：
+M5 对模型暴露一个候选评估工具、三个非成功控制动作，以及
+smolagents 内置的最终回答工具：
 
 ```text
 evaluate_candidate(
@@ -212,6 +222,9 @@ evaluate_candidate(
     verification_plan: object,
     summary: str | null
 ) -> structured result
+ask_user(question) -> needs_user_input
+report_unverifiable(reason) -> unverifiable
+report_failure(reason) -> fatal_failure
 ```
 
 不暴露以下能力：
@@ -264,7 +277,9 @@ evaluate_candidate(
 结束：通过、达到上限、或发生不可恢复的模型/环境错误
 ```
 
-`max_attempts` 是候选评估次数，不是任意 LLM 请求次数。模型动作数还必须有硬上限：默认最多 `max_attempts + 1` 个 action step，其中最后一个 step 只用于调用最终回答。
+`max_attempts` 是进入真实 PLC 评估链的候选次数，不是任意 LLM
+请求次数。结构错误不消耗候选次数。模型动作由独立的 `max_actions`
+硬上限约束，默认为 8。
 
 ### 6.2 单步限制
 
@@ -273,7 +288,8 @@ evaluate_candidate(
 - 一次 action 最多一个工具调用；
 - `evaluate_candidate` 调用后必须等待其观察结果，不能并行调用多个评估；
 - 候选评估次数达到上限后，拒绝新的候选提交；
-- 只有最近一次评估 `accepted == true` 时才允许 `final_answer`；
+- 只有进入 `accepted`、`needs_user_input`、`unverifiable`、`fatal_failure`
+  或 `exhausted` 终止状态时才允许 `final_answer`；
 - 模型不能通过普通文本输出绕过工具调用直接宣布成功；
 - `max_steps`、`max_attempts`、工具输入大小和每个真实工具的 timeout 都由宿主代码设定，模型不能修改。
 
@@ -414,7 +430,7 @@ CLI 要求：
 
 - 基于 `ToolCallingAgent` 创建 `PLCToolCallingAgent`；
 - 注入 PLC 专用 prompt；
-- 只注册 `evaluate_candidate` 和内置 `final_answer`；
+- 注册 `evaluate_candidate`、三个控制动作和内置 `final_answer`；
 - 禁止并发工具调用、任意 Python 工具和多 Agent；
 - 用 `final_answer_checks` 或等价宿主检查阻止未验证候选被宣布成功。
 
@@ -423,7 +439,7 @@ CLI 要求：
 ### 阶段 D：项目级修复循环和 CLI
 
 - 实现 `PLCRepairAgent` 的对外入口；
-- 固定 `max_attempts` 和 `max_steps`；
+- 分别固定 `max_attempts` 和 `max_actions`；
 - 汇总每次尝试和最终结果；
 - 增加 `main.py agent` 入口；
 - 更新 README 的 M5 使用、依赖、凭据和失败说明。
@@ -570,7 +586,71 @@ structured observation -> bounded repair -> accepted/failure M5Result
 
 当前证据：
 
-- 本地全量测试：37 项运行，30 项通过，7 项按环境条件跳过；
+- 本地全量测试：51 项运行，44 项通过，7 项按环境条件跳过；
 - 在 Docker 授权环境中，M1-M4 真实 MatIEC/OpenPLC 集成测试 5/5 通过；
 - 在同一真实 Runtime 中，M5 `CandidateEvaluator` 对 `problem_001` 的真实 check、compile、start、verify、stop 链路通过；
-- 当前环境没有 `PLC_AGENT_API_KEY` 和 `PLC_AGENT_MODEL_ID`，因此真实 LLM 集成测试跳过，M5 仍不能标记为 complete。
+- 2026-09-20，真实 `deepseek-flash` 工具调用模型生成完整 ST 和五步验证计划；候选通过真实 MatIEC 检查、OpenPLC GCC/link、真实扫描周期与五项行为断言，并在结束时成功停止 Runtime。M5 真实 LLM + 真实 Runtime 集成测试通过。
+
+## 15. P0 状态机和协议收口
+
+2026-09-21 完成首轮交互内核收口，不改变 `agent -> plc_tools -> runtime`
+边界：
+
+- 引入宿主控制的运行状态，区分 `needs_user_input`、`accepted`、
+  `unverifiable`、`fatal_failure` 和 `exhausted` 等结果；
+- 增加 `ask_user`、`report_unverifiable` 和 `report_failure` 控制动作，
+  模型不再需要伪造候选才能合法结束；
+- `max_actions` 独立限制模型动作，`max_attempts` 只计结构合法并进入真实
+  PLC 评估链的候选；
+- 空 ST、超长 ST 和非法验证计划会被标记为 `submission_rejected`，
+  不消耗 PLC 候选次数；
+- 保留 `agent.run()` 的最终说明，并细分鉴权、连接、上下文和工具支持错误。
+
+当前验证证据：全量测试 51 项，44 项通过，7 项按环境条件跳过；
+P0 后的 `CandidateEvaluator` 再次通过真实 MatIEC/OpenPLC
+check -> compile -> start -> verify -> stop 链路，结束后 Runtime 状态为
+`STOPPED`。
+
+## 16. P1 需求理解与候选预检
+
+2026-09-21 在 P0 协议上加入两道宿主门禁，继续保持
+`agent -> plc_tools -> runtime` 边界：
+
+- `RequirementSpec` 保存目标、输入、输出、时序、状态、安全、可观察断言、
+  假设和开放问题；信息不足时先集中追问，不接触 Runtime；
+- `submit_requirement_spec` 是候选生成前的结构化需求入口；
+- `validate_candidate` 检查 ST/验证计划结构并调用真实 `check_st_text`，不启动
+  Runtime，也不消耗 `max_attempts`；
+- `evaluate_candidate` 只接受与最近一次成功预检完全相同的 ST 和验证计划，
+  并继续作为唯一成功判定来源；
+- Runtime 状态由宿主在编译前检查；busy 或状态工具失败不会消耗真实候选次数，
+  也不会停止已有程序；
+- `max_actions` 与 `max_attempts` 保持独立，语法修复只消耗动作预算。
+
+P1 调用顺序为：
+
+```text
+自然语言 -> RequirementSpec -> 追问或生成
+         -> validate_candidate: check
+         -> evaluate_candidate: runtime preflight -> compile -> start -> verify -> stop
+```
+
+## 17. P2 进程内会话与过程事件
+
+`PLCSession` 提供 `submit()`、`resume()`、`cancel()`；每轮创建新的有界 Agent，
+但保留 RequirementSpec、最近一次已验证 ST/计划、真实验证证据、用户明确确认的
+假设和最多六份短 Turn 摘要。不无限追加完整聊天记录，不引入数据库。
+
+`PLCEvent` callback 与 UI 无关，覆盖需求分析、等待用户、候选生成、预检、编译、
+运行、逐步验证、修复、验收/失败和清理。现有一次性 JSON CLI 保持可用。
+
+取消是协作式的：正在进行的外部工具调用先返回，验证循环随后中断；
+`verify_plan` 在 `finally` 中释放已强制的变量，Agent 随后停止自己启动的
+Runtime。清理失败会使候选无法验收。
+
+真实 Runtime 验收覆盖了同一会话中对已验证电机程序增加 Enable 输入并
+重新验证、10 秒 TON 定时改为 5 秒后重新验证，以及运行中取消后的变量
+释放和 Runtime 停止。定时器验证使用相对前一步输入生效后的 `settle_ms`：
+10 秒版在 7.5 秒时保持关闭、后续开启；5 秒版在 7.5 秒时已开启。
+此前按 `time_ms` 从验证开始累计等待，会把真实 force/read 耗时误计入
+定时窗口，曾产生 expected/actual 失败；该测试计划已修正。

@@ -18,13 +18,15 @@ class RealM5IntegrationTests(unittest.TestCase):
         task = (
             "Implement a PLC motor start/stop controller. Use located BOOL inputs "
             "Start at %IX0.0 and Stop at %IX0.1, and located BOOL output Motor at "
-            "%QX0.0. When Start is true and Stop is false Motor must be true. "
-            "When Stop is true Motor must be false. Include a complete executable "
+            "%QX0.0. On every scan Motor = Start AND NOT Stop: no latching or "
+            "seal-in. Motor is false whenever Start is false or Stop is true. "
+            "Include a complete executable "
             "Structured Text program and behavior checks for the important cases."
         )
         result = PLCRepairAgent().run(M5Request(task=task, max_attempts=3))
         self.assertTrue(result.success, result.to_dict())
         self.assertTrue(result.attempts)
+        self.assertEqual(len(result.attempts), 1)
         self.assertTrue(result.attempts[-1].accepted)
         self.assertEqual(result.attempts[-1].verify_result["passed"], True)
 

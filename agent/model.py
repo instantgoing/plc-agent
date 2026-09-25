@@ -8,14 +8,23 @@ provided by the environment; this module never supplies a mock model.
 from __future__ import annotations
 
 import os
+import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
-from ._smolagents import OpenAIModel
+from ._smolagents import ChatMessage, MessageRole, OpenAIModel, Tool
 
 
 class ModelConfigurationError(RuntimeError):
     """Raised when a real model cannot be configured safely."""
+
+
+class ModelPreflightError(RuntimeError):
+    """The endpoint responded but cannot perform this Agent's tool protocol."""
+
+    def __init__(self, message: str, kind: Literal["model_tool_unsupported", "model_output_invalid"]):
+        super().__init__(message)
+        self.kind = kind
 
 
 @dataclass(frozen=True)
@@ -95,17 +104,79 @@ def build_model(config: ModelConfig | None = None, **overrides: Any):
     """Build smolagents' real OpenAI-compatible model."""
 
     selected = config or load_model_config(**overrides)
+    model_kwargs: dict[str, Any] = {
+        "model_id": selected.model_id,
+        "api_base": selected.api_base,
+        "api_key": selected.api_key,
+        "timeout": selected.timeout,
+        "max_tokens": selected.max_tokens,
+        "temperature": selected.temperature,
+        "tool_choice": "auto",
+    }
     try:
-        return OpenAIModel(
-            model_id=selected.model_id,
-            api_base=selected.api_base,
-            api_key=selected.api_key,
-            timeout=selected.timeout,
-            max_tokens=selected.max_tokens,
-            temperature=selected.temperature,
-        )
+        return OpenAIModel(**model_kwargs)
     except ModuleNotFoundError as exc:
         raise ModelConfigurationError(
             "OpenAIModel requires the smolagents openai extra; install the openai package"
         ) from exc
+
+
+def preflight_model(model: OpenAIModel, tools: list[Tool]) -> None:
+    """Exercise the configured endpoint with the actual Agent tool schemas.
+
+    A successful completion establishes that credentials, model id, and the
+    complete tool-schema payload are accepted. A returned tool call also proves
+    the model can speak the protocol; it is never executed by this probe.
+    """
+
+    reply = model.generate(
+        [
+            ChatMessage(
+                role=MessageRole.USER,
+                content=(
+                    "Tool capability check only. Call final_answer with answer "
+                    "'PLC_PREFLIGHT_OK'. Do not perform any PLC work."
+                ),
+            )
+        ],
+        tools_to_call_from=tools,
+    )
+    calls = reply.tool_calls or []
+    if not calls:
+        raise ModelPreflightError(
+            "Model did not return a tool call in the tool-capability check; "
+            "select a tool-calling model or endpoint.",
+            "model_tool_unsupported",
+        )
+    if len(calls) != 1:
+        raise ModelPreflightError(
+            "Model returned parallel tool calls, but this Agent requires one action at a time.",
+            "model_output_invalid",
+        )
+    tool_names = {tool.name for tool in tools}
+    for call in calls:
+        function = getattr(call, "function", None)
+        if function is None or getattr(function, "name", None) not in tool_names:
+            raise ModelPreflightError(
+                "Model returned a tool name outside the supplied schema.",
+                "model_output_invalid",
+            )
+        arguments = getattr(function, "arguments", None)
+        try:
+            parsed = json.loads(arguments) if isinstance(arguments, str) else arguments
+        except (TypeError, ValueError) as exc:
+            raise ModelPreflightError(
+                "Model returned malformed tool-call arguments.",
+                "model_output_invalid",
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise ModelPreflightError(
+                "Model returned non-object tool-call arguments.",
+                "model_output_invalid",
+            )
+        if function.name != "final_answer" or not isinstance(parsed.get("answer"), str):
+            raise ModelPreflightError(
+                "Model did not follow the harmless final_answer tool probe.",
+                "model_output_invalid",
+            )
 

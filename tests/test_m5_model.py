@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from agent.model import ModelConfigurationError, load_model_config
+from agent.model import ModelConfig, ModelConfigurationError, build_model, load_model_config
 
 
 class M5ModelConfigTests(unittest.TestCase):
@@ -33,6 +33,34 @@ class M5ModelConfigTests(unittest.TestCase):
             config = load_model_config()
         self.assertEqual(config.public_dict()["model_id"], "test-model")
         self.assertNotIn("api_key", config.public_dict())
+
+    @patch("agent.model.OpenAIModel")
+    def test_deepseek_uses_auto_without_disabling_thinking(self, model_mock) -> None:
+        config = ModelConfig(
+            provider="openai",
+            model_id="deepseek-flash",
+            api_key="secret",
+            api_base="https://api.deepseek.com",
+        )
+
+        build_model(config)
+
+        self.assertEqual(model_mock.call_args.kwargs["tool_choice"], "auto")
+        self.assertNotIn("extra_body", model_mock.call_args.kwargs)
+
+    @patch("agent.model.OpenAIModel")
+    def test_non_deepseek_endpoint_receives_no_vendor_thinking_parameter(self, model_mock) -> None:
+        config = ModelConfig(
+            provider="openai",
+            model_id="gpt-test",
+            api_key="secret",
+            api_base="https://example.invalid/v1",
+        )
+
+        build_model(config)
+
+        self.assertNotIn("extra_body", model_mock.call_args.kwargs)
+        self.assertEqual(model_mock.call_args.kwargs["tool_choice"], "auto")
 
 
 if __name__ == "__main__":
