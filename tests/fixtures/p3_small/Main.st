@@ -1,0 +1,7 @@
+PROGRAM MAIN
+VAR
+    StartPB AT %IX0.0 : BOOL;
+    Motor AT %QX0.0 : BOOL;
+END_VAR
+Motor := StartPB;
+END_PROGRAM

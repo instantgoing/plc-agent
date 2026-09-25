@@ -161,6 +161,60 @@ tests; `requirements-m5.txt` no longer installs smolagents. The active CLI
 does not import or initialize the old Agent. Acceptance evidence is recorded in
 [docs/phase1-acceptance.md](docs/phase1-acceptance.md).
 
+## Phase 2 PLC MCP tools
+
+Install the MCP transport dependency with `python -m pip install -r
+requirements-phase2.txt`. Start the standalone stdio server from the project
+root with `python -m plc_tools.mcp_server --project-root .`. The server logs to
+stderr and reserves stdout for MCP messages.
+
+The local Codex CLI can register `plc_mcp.py` as a stdio server. Use absolute
+paths for both the launcher and project root when registering it outside this
+repository; for example, `codex mcp add plc -- python ABSOLUTE_PATH_TO_plc_mcp.py
+--project-root ABSOLUTE_PROJECT_ROOT`. `python main.py agent/chat` supplies a
+workspace-scoped MCP configuration to its own Codex turn automatically.
+
+Available tools: `plc_project_info`, `plc_check`, `plc_compile`, `plc_start`,
+`plc_stop`, `plc_force`, `plc_read`, and `plc_verify`. They call the existing
+`plc_tools` core, just like `main.py`; `plc_trace` has no stable implementation
+and is not exposed. File arguments must name files inside the configured
+project root. Compile loads the test Runtime and reports `artifact: null`
+because there is no durable standalone artifact path. A verify result with
+`success: true, passed: false` means the real test ran and an assertion failed.
+
+See [docs/phase2-acceptance.md](docs/phase2-acceptance.md) for the tool schemas,
+safety levels, Codex acceptance, and real test results. Physical PLC operations
+are not available.
+
+## Phase 3 PLC project context
+
+Install `requirements-phase3.txt` for the ST Tree-sitter grammar and MCP server.
+The grammar package currently ships as source on PyPI, so Windows installation
+needs a C build toolchain. `plc_project_info` remains compatible with Phase 2.
+The server also exposes three Level 0 static context tools:
+
+- `plc_project_context(detail="summary")` returns counts and incomplete files.
+  Other details include `files`, `pous`, `globals`, `data_types`, `tasks`, `io`,
+  `references`, and `tests`. List sections accept `limit` and `offset`.
+- `plc_find_symbol(query="FB_Motor", match="exact")` locates declarations by
+  exact, prefix, or substring name. An I/O address such as `%QX0.0` is also a
+  valid exact query. Names can be ambiguous; results include owner and source
+  location.
+- `plc_find_references(symbol="FB_Motor")` returns declarations and resolved
+  source references. Qualified variable names such as `FB_Motor.Running` narrow
+  member lookups.
+
+`plc_context/` builds an in-memory snapshot from ST source and reparses only
+files whose modification time or size changed. It reports parser errors per
+file and keeps the rest of the project queryable. The snapshot is disposable;
+there is no maintained `context.json`. Static I/O locations also feed the
+existing compile-time debug map, while live values still come only from
+`plc_read` and `plc_verify`. Tree-sitter is for navigation; MatIEC and the
+OpenPLC test Runtime remain the syntax and behavior authorities. Existing
+check/compile tools still accept one ST file at a time. Set `--project-root`
+to one PLC project; the index includes all ST files below that root, including
+fixtures if the repository root is used.
+
 ## Legacy M5 single-Agent bounded repair loop (inactive CLI path)
 
 The following material documents the former M5 implementation. Its CLI

@@ -1,0 +1,9 @@
+FUNCTION_BLOCK FB_Alarm
+VAR_INPUT
+    Trip : BOOL;
+END_VAR
+VAR_OUTPUT
+    Active : BOOL;
+END_VAR
+Active := Trip;
+END_FUNCTION_BLOCK

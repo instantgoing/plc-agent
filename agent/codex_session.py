@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -25,6 +24,7 @@ class PLCTaskResult:
     last_failure: str | None = None
     diagnostics: str | None = None
     commands: list[dict[str, Any]] = field(default_factory=list)
+    mcp_calls: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,7 +67,7 @@ def _command_target(command: str, match: re.Match[str], workspace: Path) -> str 
 
 
 def _has_real_assertion(payload: dict[str, Any]) -> bool:
-    steps = payload.get("steps")
+    steps = payload.get("steps", payload.get("results"))
     return isinstance(steps, list) and any(
         isinstance(step, dict) and step.get("passed") is True
         and isinstance(step.get("expected"), dict) and bool(step["expected"])
@@ -76,6 +76,18 @@ def _has_real_assertion(payload: dict[str, Any]) -> bool:
                 for name, wanted in step["expected"].items())
         for step in steps
     )
+
+
+def _mcp_payload(item: dict[str, Any]) -> dict[str, Any]:
+    result = item.get("result") or {}
+    if not isinstance(result, dict):
+        return {}
+    structured = result.get("structured_content") or result.get("structuredContent")
+    return structured if isinstance(structured, dict) else {}
+
+
+def _completed_actions(turn: CodexTurn) -> list[dict[str, Any]]:
+    return turn.actions or turn.commands
 
 
 def _command_evidence(
@@ -87,19 +99,32 @@ def _command_evidence(
     started = stopped = False
     verification: tuple[tuple[str, str], tuple[str, str]] | None = None
     last_failure = diagnostics = None
-    for index, item in enumerate(turn.commands):
+    for index, item in enumerate(_completed_actions(turn)):
         command = str(item.get("command") or "")
         output = str(item.get("aggregated_output") or "")
         exit_code = item.get("exit_code")
         action, match = _cli_action(command)
         snapshot = snapshots[index] if index < len(snapshots) else {}
         target = _command_target(command, match, workspace) if match and action in {"check", "compile", "run", "verify"} else None
-        try:
-            payload = json.loads(output)
-            if not isinstance(payload, dict):
+        if item.get("type") == "mcp_tool_call" and item.get("server") == "plc":
+            tool = str(item.get("tool") or "")
+            action = tool.removeprefix("plc_") if tool.startswith("plc_") else None
+            payload = _mcp_payload(item)
+            exit_code = 0 if item.get("status") == "completed" and not item.get("error") else 1
+            raw = (item.get("arguments") or {}).get("file") if isinstance(item.get("arguments"), dict) else None
+            if isinstance(raw, str):
+                try:
+                    target = str((workspace / raw).resolve().relative_to(workspace))
+                except ValueError:
+                    target = None
+            output = json.dumps(payload, ensure_ascii=False)
+        else:
+            try:
+                payload = json.loads(output)
+                if not isinstance(payload, dict):
+                    payload = {}
+            except (ValueError, TypeError):
                 payload = {}
-        except (ValueError, TypeError):
-            payload = {}
         if action == "check" and exit_code == 0 and payload.get("success") is True and target in snapshot:
             checked_revisions[target] = snapshot[target]
         elif action in {"compile", "run"}:
@@ -117,14 +142,14 @@ def _command_evidence(
             stopped = False
         elif action == "verify":
             verification = None
-            if (exit_code == 0 and payload.get("passed") is True and _has_real_assertion(payload)
+            if (exit_code == 0 and payload.get("success", True) is True and payload.get("passed") is True and _has_real_assertion(payload)
                     and loaded and started and checked_revisions.get(loaded[0]) == loaded[1]
                     and snapshot.get(loaded[0]) == loaded[1] and target in snapshot):
                 verification = (loaded, (target, snapshot[target]))
         elif action == "stop":
             stopped = exit_code == 0 and payload.get("success") is True
-        if action and exit_code not in (0, None):
-            last_failure = f"command exited {exit_code}: {command[:200]}"
+        if action and (exit_code not in (0, None) or payload.get("success") is False):
+            last_failure = f"PLC tool failed: {tool if item.get('type') == 'mcp_tool_call' else command[:200]}"
             diagnostics = output[-4000:]
     modified_st = [name for name in modified if name.lower().endswith(".st")]
     checked = all(checked_revisions.get(name) == final.get(name) for name in modified_st)
@@ -144,19 +169,32 @@ def _cleanup_interrupted_runtime(turn: CodexTurn) -> str | None:
     running = False
     input_names: set[str] = set()
     forced_names: set[str] = set()
-    for item in turn.commands:
+    for item in _completed_actions(turn):
         command = str(item.get("command") or "")
         action_match = re.search(r"main\.py['\"\s]+(compile|run|start|stop|force)\b", command, re.I)
         action = action_match.group(1).lower() if action_match else None
+        mcp = item.get("type") == "mcp_tool_call" and item.get("server") == "plc"
+        payload = _mcp_payload(item) if mcp else {}
+        if mcp:
+            tool = str(item.get("tool") or "")
+            action = tool.removeprefix("plc_") if tool.startswith("plc_") else None
         if action == "force":
-            forced_names.update(name.lower() for name in re.findall(r"--set\s+['\"]?([\w.]+)=", command, re.I))
-            if item.get("exit_code") == 0:
-                forced_names.difference_update(name.lower() for name in re.findall(r"--release\s+['\"]?([\w.]+)", command, re.I))
-        if item.get("exit_code") != 0:
+            if mcp:
+                arguments = item.get("arguments") or {}
+                if isinstance(arguments, dict):
+                    forced_names.update(str(name).lower() for name in (arguments.get("variables") or {}))
+                    if payload.get("success") is True:
+                        forced_names.difference_update(str(name).lower() for name in (arguments.get("release") or []))
+            else:
+                forced_names.update(name.lower() for name in re.findall(r"--set\s+['\"]?([\w.]+)=", command, re.I))
+                if item.get("exit_code") == 0:
+                    forced_names.difference_update(name.lower() for name in re.findall(r"--release\s+['\"]?([\w.]+)", command, re.I))
+        if (mcp and payload.get("success") is not True) or (not mcp and item.get("exit_code") != 0):
             continue
         if action in {"compile", "run"}:
             try:
-                payload = json.loads(str(item.get("aggregated_output") or ""))
+                if not mcp:
+                    payload = json.loads(str(item.get("aggregated_output") or ""))
                 compiled = payload.get("compile", payload)
                 input_names.update(
                     variable["name"] for variable in compiled.get("variables", [])
@@ -169,14 +207,18 @@ def _cleanup_interrupted_runtime(turn: CodexTurn) -> str | None:
         elif action == "stop":
             running = False
     pending = [str(item.get("command") or "") for item in turn.pending_commands]
+    pending_mcp_start = any(item.get("tool") == "plc_start" for item in turn.pending_mcp_calls)
+    for item in turn.pending_mcp_calls:
+        if item.get("tool") == "plc_force" and isinstance(item.get("arguments"), dict):
+            forced_names.update(str(name).lower() for name in (item["arguments"].get("variables") or {}))
     for command in pending:
         if any(match.group(1).lower() == "force" for match in _CLI_RE.finditer(command)):
             forced_names.update(name.lower() for name in re.findall(r"--set\s+['\"]?([\w.]+)=", command, re.I))
     errors: list[str] = []
-    if turn.error and any(
+    if turn.error and (pending_mcp_start or any(
         match.group(1).lower() in {"run", "start"}
         for command in pending for match in _CLI_RE.finditer(command)
-    ):
+    )):
         from plc_tools import get_plc_status
         try:
             status = get_plc_status()
@@ -260,21 +302,22 @@ class CodexPLCSession:
         return self.client.interrupt()
 
     def _instructions(self, user_message: str) -> str:
-        entry = self.project_path / "main.py"
-        python = Path(sys.executable)
         return (
             f"PLC engineering workspace: {self.workspace}\n"
-            f"PLC tool entrypoint: {entry}\n"
-            f"Python interpreter: {python}\n"
-            "Use the existing CLI commands: check SOURCE.st, compile SOURCE.st, run SOURCE.st, "
-            "start, stop, force --set NAME=VALUE, read NAME, verify PLAN.json. "
-            "Run them as separate shell commands using the Python interpreter and tool entrypoint above. "
-            "These commands return structured JSON and nonzero exit codes for PLC failures. "
+            "Before non-trivial PLC edits, query plc_project_context. Use plc_find_symbol "
+            "to locate symbols and plc_find_references before changing shared POUs, globals, "
+            "or interfaces. Inspect the source at returned locations; names may be ambiguous. "
+            "Source files are authoritative; context is derived. "
+            "Use the PLC MCP tools for PLC operations: plc_project_info, plc_check, "
+            "plc_compile, plc_start, plc_stop, plc_force, plc_read, plc_verify. "
+            "Use shell only for ordinary file inspection, editing, and Git. "
+            "The MCP tool responses contain structured diagnostics and errors. "
             f"At most {self.max_repair_attempts} check/compile attempts are allowed this turn. "
+            f"At most {self.max_commands} shell and PLC MCP actions are allowed this turn. "
             "If a command fails, read its diagnostics and repair within the limit. "
             "If you start the test Runtime, release forced variables and stop it before finishing. "
             "Do not treat compiler success as behavior verification. Do not claim behavior success "
-            "unless a real verify command returned passed=true. "
+            "unless a real plc_verify call returned passed=true. "
             "Keep edits within the workspace and preserve a clear diff. "
             f"\nUser request:\n{user_message}"
         )
@@ -283,11 +326,11 @@ class CodexPLCSession:
         if not isinstance(user_message, str) or not user_message.strip():
             raise ValueError("user_message must be nonempty")
         before = _plc_snapshot(self.workspace)
-        command_snapshots: list[dict[str, str]] = []
+        action_snapshots: list[dict[str, str]] = []
 
         def emit(event: dict[str, Any]) -> None:
-            if event.get("type") == "item.completed" and (event.get("item") or {}).get("type") == "command_execution":
-                command_snapshots.append(_plc_snapshot(self.workspace))
+            if event.get("type") == "item.completed" and (event.get("item") or {}).get("type") in {"command_execution", "mcp_tool_call"}:
+                action_snapshots.append(_plc_snapshot(self.workspace))
             if event.get("type") == "thread.started" and event.get("thread_id"):
                 self.thread_id = str(event["thread_id"])
                 self._save()
@@ -313,7 +356,7 @@ class CodexPLCSession:
         modified = sorted(name for name in before.keys() | after.keys() if before.get(name) != after.get(name))
         modified_st = any(name.lower().endswith(".st") for name in modified)
         checked, verified, last_failure, diagnostics = _command_evidence(
-            turn, command_snapshots, self.workspace, after, modified
+            turn, action_snapshots, self.workspace, after, modified
         )
         if turn.error:
             state = ("attempt_limit_reached" if turn.limit_reached else
@@ -343,6 +386,7 @@ class CodexPLCSession:
             project_path=str(self.project_path), files_modified=modified,
             last_failure=last_failure or turn.error, diagnostics=diagnostics,
             commands=turn.commands,
+            mcp_calls=turn.mcp_calls,
         )
         self.last_result = result
         return result

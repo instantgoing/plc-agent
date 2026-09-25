@@ -69,6 +69,19 @@ class CodexClientTests(unittest.TestCase):
         self.assertTrue(process.terminated)
         self.assertEqual(len(result.pending_commands), 1)
 
+    def test_mcp_check_counts_toward_repair_limit(self):
+        process = FakeProcess(events=[
+            {"type": "item.started", "item": {"id": f"mcp-{n}", "type": "mcp_tool_call",
+                                             "server": "plc", "tool": "plc_check", "arguments": {"file": "motor.st"}}}
+            for n in range(6)
+        ])
+        with tempfile.TemporaryDirectory() as directory:
+            client = CodexClient(executable="codex")
+            with patch.object(client, "_check_auth"), patch("agent.codex_client.subprocess.Popen", return_value=process):
+                result = client.run("Check", workspace=Path(directory), max_repair_attempts=5)
+        self.assertTrue(result.limit_reached)
+        self.assertTrue(process.terminated)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,7 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -30,7 +31,10 @@ class CodexTurn:
     completed: bool = False
     error: str | None = None
     commands: list[dict[str, Any]] = field(default_factory=list)
+    mcp_calls: list[dict[str, Any]] = field(default_factory=list)
+    actions: list[dict[str, Any]] = field(default_factory=list)
     pending_commands: list[dict[str, Any]] = field(default_factory=list)
+    pending_mcp_calls: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     limit_reached: bool = False
 
@@ -104,7 +108,15 @@ class CodexClient:
         workspace = workspace.resolve(strict=True)
         if not workspace.is_dir():
             raise CodexInfrastructureError(f"workspace is not a directory: {workspace}")
-        command = [*_launch_prefix(self.executable), "exec"]
+        project_root = Path(__file__).resolve().parents[1]
+        mcp_args = [str(project_root / "plc_mcp.py"), "--project-root", str(workspace)]
+        # Explicit per-turn configuration works even with --ignore-user-config
+        # and binds every MCP file operation to this Codex workspace.
+        command = [
+            *_launch_prefix(self.executable), "exec",
+            "-c", f"mcp_servers.plc.command={json.dumps(sys.executable)}",
+            "-c", f"mcp_servers.plc.args={json.dumps(mcp_args, ensure_ascii=False)}",
+        ]
         if thread_id:
             command += ["--approve-for-me", "resume", "--json", "--ignore-user-config", thread_id, prompt]
         else:
@@ -141,7 +153,7 @@ class CodexClient:
         stdout_reader.start()
         stderr_reader.start()
         open_streams = 2
-        commands_started = 0
+        actions_started = 0
         repair_attempts = 0
         deadline = time.monotonic() + self.timeout_seconds
         try:
@@ -188,22 +200,39 @@ class CodexClient:
                     outcome.final_answer = str(item.get("text") or outcome.final_answer)
                 if item.get("type") == "command_execution":
                     if event_type == "item.started":
-                        commands_started += 1
+                        actions_started += 1
                         command_text = str(item.get("command") or "")
                         repair_attempts += len(re.findall(
                             r"main\.py['\"\s]+(?:check|compile|run)\b", command_text, re.I
                         ))
                         outcome.pending_commands.append(item)
-                        if commands_started > max_commands or repair_attempts > max_repair_attempts:
+                        if actions_started > max_commands or repair_attempts > max_repair_attempts:
                             outcome.limit_reached = True
                             outcome.error = "command or PLC repair attempt limit reached"
                             process.terminate()
                     elif event_type == "item.completed":
                         outcome.commands.append(item)
+                        outcome.actions.append(item)
                         for index, pending in enumerate(outcome.pending_commands):
                             if pending.get("id") == item.get("id") and pending.get("command") == item.get("command"):
                                 del outcome.pending_commands[index]
                                 break
+                elif item.get("type") == "mcp_tool_call" and item.get("server") == "plc":
+                    if event_type == "item.started":
+                        actions_started += 1
+                        tool = str(item.get("tool") or "")
+                        if tool in {"plc_check", "plc_compile"}:
+                            repair_attempts += 1
+                        outcome.pending_mcp_calls.append(item)
+                        if actions_started > max_commands or repair_attempts > max_repair_attempts:
+                            outcome.limit_reached = True
+                            outcome.error = "action or PLC repair attempt limit reached"
+                            process.terminate()
+                    elif event_type == "item.completed":
+                        outcome.mcp_calls.append(item)
+                        outcome.actions.append(item)
+                        outcome.pending_mcp_calls = [pending for pending in outcome.pending_mcp_calls
+                                                     if pending.get("id") != item.get("id")]
                 if on_event:
                     on_event(event)
             try:

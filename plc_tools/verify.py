@@ -71,6 +71,14 @@ def verify_plan(
     if not any(isinstance(step.get("expect", step.get("expected")), dict)
                and step.get("expect", step.get("expected")) for step in steps):
         return VerifyResult(False, [], [], "test plan must contain at least one output assertion")
+    for index, step in enumerate(steps, start=1):
+        if not isinstance(step.get("inputs", {}), dict) or not isinstance(
+            step.get("expect", step.get("expected", {})), dict
+        ):
+            return VerifyResult(False, [], [], f"step {index}: inputs and expected must be objects")
+        for field in ("time_ms", "settle_ms"):
+            if field in step and (type(step[field]) is not int or step[field] < 0):
+                return VerifyResult(False, [], [], f"step {index}: {field} must be a nonnegative integer")
     status = get_plc_status()
     if not status.success or status.actual_status != "RUNNING":
         detail = status.tool_error or f"PLC status is {status.actual_status}"
@@ -155,7 +163,7 @@ def verify_plan(
                         "",
                         expected,
                         actual,
-                        read_result.tool_error or "variable read failed",
+                        "read failed: " + (read_result.tool_error or "variable read failed"),
                     )
                 )
             for name, wanted in expected.items():

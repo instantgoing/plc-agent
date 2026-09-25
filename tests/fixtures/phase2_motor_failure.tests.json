@@ -1,0 +1,5 @@
+{
+  "steps": [
+    {"inputs": {"Start": false, "Stop": true}, "expected": {"Motor": true}, "settle_ms": 100}
+  ]
+}

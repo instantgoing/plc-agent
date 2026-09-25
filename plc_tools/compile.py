@@ -97,7 +97,8 @@ def compile_st(source_path: str | Path, *, timeout: float = 90.0) -> CompileResu
             [],
         )
 
-    variables = parse_variable_map(compiled.variables_csv, st_code)
+    variables = parse_variable_map(compiled.variables_csv, st_code,
+                                   fragment_fallback=False)
 
     try:
         uploaded = upload_program(compiled.package_path, timeout=timeout)

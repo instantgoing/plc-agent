@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {"name": "Reset with Stop", "inputs": {"Start": false, "Stop": true}, "expected": {"Motor": false}, "settle_ms": 100},
+    {"name": "Idle", "inputs": {"Stop": false}, "expected": {"Motor": false}, "settle_ms": 100},
+    {"name": "Rising Start starts Motor", "inputs": {"Start": true}, "expected": {"Motor": true}, "settle_ms": 100},
+    {"name": "Start release preserves running", "inputs": {"Start": false}, "expected": {"Motor": true}, "settle_ms": 100},
+    {"name": "Immediate Stop wins over simultaneous rising Start", "inputs": {"Start": true, "Stop": true}, "expected": {"Motor": false}, "settle_ms": 60},
+    {"name": "Releasing Stop with Start held does not restart", "inputs": {"Stop": false}, "expected": {"Motor": false}, "settle_ms": 100},
+    {"name": "Rearm Start", "inputs": {"Start": false}, "expected": {"Motor": false}, "settle_ms": 100},
+    {"name": "Fresh edge restarts after Stop", "inputs": {"Start": true}, "expected": {"Motor": true}, "settle_ms": 100},
+    {"name": "Continuous running before timeout", "inputs": {"Start": false}, "expected": {"Motor": true}, "settle_ms": 1000},
+    {"name": "Another Start edge does not reset running timer", "inputs": {"Start": true}, "expected": {"Motor": true}, "settle_ms": 100},
+    {"name": "Still running well before ten-second timeout", "inputs": {}, "expected": {"Motor": true}, "settle_ms": 5000},
+    {"name": "Ten-second timeout stops Motor (sample after 10.7 seconds plus IO overhead)", "inputs": {}, "expected": {"Motor": false}, "settle_ms": 4500},
+    {"name": "Held Start cannot restart after timeout", "inputs": {}, "expected": {"Motor": false}, "settle_ms": 200},
+    {"name": "Rearm after timeout", "inputs": {"Start": false}, "expected": {"Motor": false}, "settle_ms": 100},
+    {"name": "Fresh edge restarts with reset timer", "inputs": {"Start": true}, "expected": {"Motor": true}, "settle_ms": 100},
+    {"name": "Stop alone immediately interrupts running", "inputs": {"Stop": true}, "expected": {"Motor": false}, "settle_ms": 60},
+    {"name": "Finish stopped with Start low", "inputs": {"Start": false, "Stop": true}, "expected": {"Motor": false}, "settle_ms": 100}
+  ]
+}

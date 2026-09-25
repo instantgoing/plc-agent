@@ -23,6 +23,21 @@ class VariableContractTests(unittest.TestCase):
         self.assertEqual([item.index for item in variables], [0, 1])
         self.assertEqual([item.location for item in variables], ["%IX0.0", "%QX0.0"])
 
+    def test_full_st_runtime_locations_come_from_parser_not_comment_text(self) -> None:
+        raw = ("1;IN;CONFIG0.RES0.INST0.START;x;BOOL;BOOL;0;\n"
+               "2;OUT;CONFIG0.RES0.INST0.MOTOR;x;BOOL;BOOL;0;\n")
+        st = ("PROGRAM MAIN\nVAR\nStart AT %IX0.0 : BOOL;\n"
+              "Motor AT %QX0.0 : BOOL;\nEND_VAR\n"
+              "(* Start AT %IX9.9 *)\nMotor := Start;\nEND_PROGRAM\n")
+        variables = parse_variable_map(raw, st)
+        self.assertEqual([item.location for item in variables], ["%IX0.0", "%QX0.0"])
+
+    def test_runtime_source_does_not_guess_address_from_unsupported_syntax(self) -> None:
+        raw = "1;IN;CONFIG0.RES0.INST0.START;x;BOOL;BOOL;0;\n"
+        variables = parse_variable_map(raw, "VENDOR_MAGIC\n(* Start AT %IX9.9 *)\n",
+                                       fragment_fallback=False)
+        self.assertEqual(variables[0].location, "")
+
     def test_debug_commands_match_openplc_wire_format(self) -> None:
         self.assertEqual(_build_read_command([0, 258]), "44 00 02 00 00 01 02")
         self.assertEqual(_build_force_command(1, 1, b"\x01"), "42 00 01 01 00 01 01")

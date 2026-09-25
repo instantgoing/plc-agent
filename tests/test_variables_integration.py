@@ -14,7 +14,7 @@ class RealVariableIntegrationTests(unittest.TestCase):
     root = Path(__file__).parents[1]
 
     def test_force_input_scan_and_read_output(self) -> None:
-        compiled = compile_st(self.root / "examples" / "motor_start_stop.st")
+        compiled = compile_st(self.root / "tests" / "fixtures" / "m3_motor_follow.st")
         self.assertTrue(compiled.success, compiled.to_dict())
         self.assertEqual([item.name for item in compiled.variables], ["start", "motor"])
         started = start_plc()

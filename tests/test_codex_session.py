@@ -43,6 +43,39 @@ class FailedCodex(RecordingCodex):
 
 
 class CodexSessionTests(unittest.TestCase):
+    def test_mcp_evidence_can_verify_modified_program(self):
+        def mcp(tool, payload, file=None):
+            return {"type": "mcp_tool_call", "server": "plc", "tool": tool,
+                    "arguments": {"file": file} if file else {}, "status": "completed",
+                    "result": {"structured_content": payload}, "error": None}
+
+        calls = [
+            mcp("plc_check", {"success": True, "diagnostics": []}, "motor.st"),
+            mcp("plc_compile", {"success": True, "variables": []}, "motor.st"),
+            mcp("plc_start", {"success": True, "state": "running"}),
+            mcp("plc_verify", {"success": True, "passed": True, "results": [
+                {"passed": True, "expected": {"Motor": False}, "actual": {"motor": False}}
+            ]}, "motor.tests.json"),
+            mcp("plc_stop", {"success": True, "state": "stopped"}),
+        ]
+
+        class MCPRecordingCodex(RecordingCodex):
+            def run(self, prompt, *, workspace, thread_id, max_repair_attempts, max_commands, on_event):
+                (workspace / "motor.st").write_text("PROGRAM Main\nVAR Motor : BOOL; END_VAR\nEND_PROGRAM\n")
+                for item in calls:
+                    on_event({"type": "item.completed", "item": item})
+                return CodexTurn(completed=True, exit_code=0, final_answer="verified",
+                                 mcp_calls=calls, actions=calls)
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            (workspace / "motor.st").write_text("PROGRAM Main\nEND_PROGRAM\n")
+            (workspace / "motor.tests.json").write_text('{"steps": [{"expected": {"Motor": false}}]}')
+            result = CodexPLCSession(workspace=workspace, client=MCPRecordingCodex()).run("Edit motor")
+        self.assertTrue(result.success)
+        self.assertEqual(result.state, "verified")
+        self.assertEqual(len(result.mcp_calls), 5)
+
     def test_codex_failure_releases_inputs_and_stops_started_runtime(self):
         compiled = {
             "type": "command_execution", "command": "python main.py compile motor.st",

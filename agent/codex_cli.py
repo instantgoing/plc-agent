@@ -25,6 +25,13 @@ def print_event(event: dict[str, Any], *, stream: Any = None) -> None:
         output = str(item.get("aggregated_output") or "").strip()
         if output:
             print(output[-4000:], file=stream, flush=True)
+    elif kind == "item.started" and item_type == "mcp_tool_call" and item.get("server") == "plc":
+        print(f"PLC MCP start: {item.get('tool', '')}", file=stream, flush=True)
+    elif kind == "item.completed" and item_type == "mcp_tool_call" and item.get("server") == "plc":
+        print(f"PLC MCP {item.get('status', 'unknown')}: {item.get('tool', '')}", file=stream, flush=True)
+        structured = (item.get("result") or {}).get("structured_content")
+        if structured is not None:
+            print(json.dumps(structured, ensure_ascii=False)[-4000:], file=stream, flush=True)
     elif kind == "item.completed" and item_type == "file_change":
         print(f"File modification: {json.dumps(item.get('changes', []), ensure_ascii=False)}", file=stream, flush=True)
     elif kind == "item.completed" and item_type == "agent_message":

@@ -38,6 +38,11 @@ class VerifyContractTests(unittest.TestCase):
                 self.assertFalse(result.passed)
                 self.assertIn("assertion", result.tool_error or "")
 
+    def test_invalid_timing_is_structured_failure(self) -> None:
+        result = verify_plan({"steps": [{"expected": {"Motor": False}, "settle_ms": "soon"}]})
+        self.assertFalse(result.passed)
+        self.assertIn("settle_ms", result.tool_error or "")
+
     @patch("plc_tools.verify.get_plc_status")
     @patch("plc_tools.verify.force_variables")
     @patch("plc_tools.verify.read_variables")

@@ -1,0 +1,9 @@
+{
+  "steps": [
+    {"inputs": {"StartPB": false, "StopPB": false, "FaultPB": false}, "expected": {"Motor": false}},
+    {"inputs": {"StartPB": true}, "expected": {"Motor": true}},
+    {"inputs": {"FaultPB": true}, "expected": {"Motor": false}},
+    {"inputs": {"FaultPB": false}, "expected": {"Motor": true}},
+    {"inputs": {"StopPB": true}, "expected": {"Motor": false}}
+  ]
+}

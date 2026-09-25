@@ -8,6 +8,8 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from plc_context.st_adapter import parse_st
+
 
 @dataclass(frozen=True)
 class VariableEntry:
@@ -22,15 +24,32 @@ def _state_path() -> Path:
     return Path(configured).resolve() if configured else Path(".plc-agent/state.json").resolve()
 
 
-def parse_variable_map(raw_csv: str, st_code: str) -> list[VariableEntry]:
-    locations = {
-        match.group(1).lower(): match.group(2).upper()
-        for match in re.finditer(
-            r"\b([A-Za-z_][A-Za-z0-9_]*)\s+AT\s+(%[IQM][A-Z]*[0-9][0-9.]*)",
-            st_code,
-            re.IGNORECASE,
-        )
-    }
+def parse_variable_map(raw_csv: str, st_code: str, *,
+                       fragment_fallback: bool = True) -> list[VariableEntry]:
+    # The same ST adapter supplies static I/O bindings to context queries and
+    # to the compiled Runtime debug map. The regex branch only preserves the
+    # historical contract for declaration fragments passed by older callers.
+    parsed = parse_st(st_code.encode("utf-8"), "<compiled source>")
+    declarations = [*parsed.globals,
+                    *(variable for pou in parsed.pous for variable in pou.variables)]
+    locations: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for variable in declarations:
+        if variable.address:
+            key = variable.name.casefold()
+            if key in locations and locations[key] != variable.address:
+                ambiguous.add(key)
+            locations[key] = variable.address
+    for key in ambiguous:
+        del locations[key]
+    if fragment_fallback and not parsed.pous and not parsed.globals:
+        locations = {
+            match.group(1).lower(): match.group(2).upper()
+            for match in re.finditer(
+                r"\b([A-Za-z_][A-Za-z0-9_]*)\s+AT\s+(%[IQM][A-Z]*[0-9][0-9.]*)",
+                st_code, re.IGNORECASE,
+            )
+        }
     variables: list[VariableEntry] = []
     debug_index = 0
     for raw_line in raw_csv.splitlines():
