@@ -1,0 +1,10 @@
+{
+  "steps": [
+    {"note": "idle", "inputs": {"Start": false, "Stop": false, "Fault": false}, "settle_ms": 100, "expect": {"Motor": false}},
+    {"note": "start", "inputs": {"Start": true}, "settle_ms": 200, "expect": {"Motor": true, "Motor1.Running": true, "Motor2.Running": false}},
+    {"note": "fault interlock", "inputs": {"Fault": true}, "settle_ms": 100, "expect": {"Motor": false}},
+    {"note": "fault clear", "inputs": {"Fault": false}, "settle_ms": 100, "expect": {"Motor": true}},
+    {"note": "five second stop", "settle_ms": 5100, "expect": {"Motor": false, "MotorTimer.Q": true}},
+    {"note": "reset", "inputs": {"Start": false}, "settle_ms": 100, "expect": {"Motor": false, "MotorTimer.Q": false}}
+  ]
+}

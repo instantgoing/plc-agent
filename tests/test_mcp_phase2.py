@@ -41,9 +41,10 @@ class MCPProtocolTests(unittest.TestCase):
             "plc_project_info", "plc_check", "plc_compile", "plc_start",
             "plc_stop", "plc_force", "plc_read", "plc_verify",
             "plc_project_context", "plc_find_symbol", "plc_find_references",
+            "plc_unforce", "plc_trace",
         })
         self.assertTrue(info["success"])
-        self.assertFalse(info["capabilities"]["trace"])
+        self.assertTrue(info["capabilities"]["trace"])
         self.assertFalse(missing["success"])
         self.assertIn(missing["error"]["type"], {"unknown_variable", "read_failed"})
         self.assertIn("diagnostics", checked)

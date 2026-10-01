@@ -9,6 +9,7 @@ import shutil
 import ssl
 import subprocess
 import time
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -200,6 +201,7 @@ class _RuntimeClient:
         )
         self.context = ssl.create_default_context() if verify else ssl._create_unverified_context()
         self.token: str | None = None
+        self.debug_sid: str | None = None
 
     def _request(
         self,
@@ -296,36 +298,32 @@ class _RuntimeClient:
             except (OSError, urllib.error.URLError, TimeoutError) as exc:
                 raise OpenPLCConfigurationError(f"OpenPLC debug socket failed: {exc}") from exc
 
-        handshake = polling_request("GET")
-        first_packet = handshake.split("\x1e", 1)[0]
-        if not first_packet.startswith("0"):
-            raise OpenPLCConfigurationError("OpenPLC debug socket returned no handshake")
-        try:
-            sid = str(json.loads(first_packet[1:])["sid"])
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            raise OpenPLCConfigurationError("OpenPLC debug handshake was malformed") from exc
-
         namespace = "/api/debug"
-        polling_request(
-            "POST",
-            sid=sid,
-            body=f"40{namespace},{json.dumps({'token': self.authenticate()}, separators=(',', ':'))}",
-        )
-
-        connected = False
-        while time.monotonic() < deadline and not connected:
-            payload = polling_request("GET", sid=sid)
-            for packet in payload.split("\x1e"):
-                if packet == "2":
-                    polling_request("POST", sid=sid, body="3")
-                elif packet.startswith(f"40{namespace},"):
-                    connected = True
-                elif packet.startswith(f"42{namespace},"):
-                    connected = True
-            if not payload:
-                time.sleep(0.02)
-        if not connected:
-            raise OpenPLCConfigurationError("OpenPLC debug namespace did not connect")
+        sid = self.debug_sid
+        if sid is None:
+            handshake = polling_request("GET")
+            first_packet = handshake.split("\x1e", 1)[0]
+            if not first_packet.startswith("0"):
+                raise OpenPLCConfigurationError("OpenPLC debug socket returned no handshake")
+            try:
+                sid = str(json.loads(first_packet[1:])["sid"])
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                raise OpenPLCConfigurationError("OpenPLC debug handshake was malformed") from exc
+            polling_request("POST", sid=sid,
+                body=f"40{namespace},{json.dumps({'token': self.authenticate()}, separators=(',', ':'))}")
+            connected = False
+            while time.monotonic() < deadline and not connected:
+                payload = polling_request("GET", sid=sid)
+                for packet in payload.split("\x1e"):
+                    if packet == "2":
+                        polling_request("POST", sid=sid, body="3")
+                    elif packet.startswith((f"40{namespace},", f"42{namespace},")):
+                        connected = True
+                if not payload:
+                    time.sleep(0.02)
+            if not connected:
+                raise OpenPLCConfigurationError("OpenPLC debug namespace did not connect")
+            self.debug_sid = sid
 
         event = json.dumps(
             ["debug_command", {"command": command}], separators=(",", ":")
@@ -437,6 +435,9 @@ def runtime_command(target: str, *, timeout: float) -> RuntimeCommandResult:
         raise ValueError(f"unsupported runtime target: {target}")
     _require_running_container(min(timeout, 15.0))
     client = _RuntimeClient()
+    actual = client.status()
+    if actual == target:
+        return RuntimeCommandResult(actual, f"PLC is already {target}")
     message = client.command(target)
     deadline = time.monotonic() + timeout
     matches = 0
@@ -453,6 +454,38 @@ def runtime_command(target: str, *, timeout: float) -> RuntimeCommandResult:
     return RuntimeCommandResult(actual, message)
 
 
+_debug_client: _RuntimeClient | None = None
+_debug_key: tuple | None = None
+_debug_lock = threading.Lock()
+
+
 def run_debug_command(command: str, *, timeout: float = 5.0) -> str:
-    _require_running_container(min(timeout, 15.0))
-    return _RuntimeClient().debug_command(command, timeout=timeout)
+    """Reuse one authenticated debug channel; transport errors invalidate it.
+
+    No Docker subprocess is necessary for each observation: the configured test
+    Runtime endpoint itself confirms or rejects every debug request.
+    """
+    global _debug_client, _debug_key
+    key = tuple(os.environ.get(k) for k in ("PLC_OPENPLC_URL", "PLC_OPENPLC_USER", "PLC_OPENPLC_PASSWORD", "PLC_OPENPLC_TLS_VERIFY"))
+    with _debug_lock:
+        if _debug_client is None or key != _debug_key:
+            _debug_client, _debug_key = _RuntimeClient(), key
+        try:
+            return _debug_client.debug_command(command, timeout=timeout)
+        except OpenPLCConfigurationError:
+            _debug_client = None
+            raise
+
+
+def runtime_program_hash(*, timeout: float = 5.0) -> str:
+    # Linux MatIEC is little endian. AD DE encodes 0xDEAD natively and selects
+    # SAME_ENDIANNESS; DE AD would make Runtime reverse all numeric payloads.
+    raw = run_debug_command("45 AD DE 00 00", timeout=timeout)
+    try:
+        payload = bytes.fromhex(raw)
+        digest = payload[2:].rstrip(b"\x00").decode("ascii")
+        if payload[:2] != b"E~" or len(digest) != 32 or any(c not in "0123456789abcdef" for c in digest.lower()):
+            raise ValueError("invalid hash")
+        return digest.lower()
+    except (ValueError, UnicodeError) as exc:
+        raise OpenPLCConfigurationError("Runtime returned an invalid program hash") from exc

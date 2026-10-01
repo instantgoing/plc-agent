@@ -62,6 +62,22 @@ def _launch_prefix(executable: str) -> list[str]:
     return [executable]
 
 
+def _codex_environment() -> dict[str, str]:
+    """Keep Codex network settings scoped to its child process."""
+    child_env = os.environ.copy()
+    # This is the old Chat Completions credential, not Codex auth.
+    child_env.pop("PLC_AGENT_API_KEY", None)
+    proxy = child_env.pop("PLC_CODEX_PROXY", "").strip()
+    if proxy:
+        for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+            child_env[name] = proxy
+        # MCP and other localhost services must remain local.
+        local = {"localhost", "127.0.0.1", "::1"}
+        existing = child_env.get("NO_PROXY", "") or child_env.get("no_proxy", "")
+        child_env["NO_PROXY"] = ",".join(sorted(local | {part.strip() for part in existing.split(",") if part.strip()}))
+    return child_env
+
+
 class CodexClient:
     def __init__(self, *, executable: str | None = None, timeout_seconds: int = 900):
         self.executable = executable or _codex_binary()
@@ -110,15 +126,19 @@ class CodexClient:
             raise CodexInfrastructureError(f"workspace is not a directory: {workspace}")
         project_root = Path(__file__).resolve().parents[1]
         mcp_args = [str(project_root / "plc_mcp.py"), "--project-root", str(workspace)]
+        from plc_tools.state import _state_path
         # Explicit per-turn configuration works even with --ignore-user-config
         # and binds every MCP file operation to this Codex workspace.
         command = [
             *_launch_prefix(self.executable), "exec",
             "-c", f"mcp_servers.plc.command={json.dumps(sys.executable)}",
             "-c", f"mcp_servers.plc.args={json.dumps(mcp_args, ensure_ascii=False)}",
+            "-c", f"mcp_servers.plc.env.PLC_STATE_FILE={json.dumps(str(_state_path()), ensure_ascii=False)}",
         ]
+        if os.environ.get("PLC_DEBUG_GATEWAY_URL"):
+            command += ["-c", f"mcp_servers.plc.env.PLC_DEBUG_GATEWAY_URL={json.dumps(os.environ['PLC_DEBUG_GATEWAY_URL'])}"]
         if thread_id:
-            command += ["--approve-for-me", "resume", "--json", "--ignore-user-config", thread_id, prompt]
+            command += ["--approve-for-me", "resume", "--json", "--ignore-user-config", "--skip-git-repo-check", thread_id, prompt]
         else:
             command += [
                 "--json", "--ignore-user-config",
@@ -129,9 +149,7 @@ class CodexClient:
         received: queue.Queue[tuple[str, str | None]] = queue.Queue()
 
         try:
-            child_env = os.environ.copy()
-            # This is the old Chat Completions credential, not Codex auth.
-            child_env.pop("PLC_AGENT_API_KEY", None)
+            child_env = _codex_environment()
             process = subprocess.Popen(
                 command, cwd=workspace, stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -156,6 +174,7 @@ class CodexClient:
         actions_started = 0
         repair_attempts = 0
         deadline = time.monotonic() + self.timeout_seconds
+        last_stderr = ""
         try:
             while open_streams:
                 if time.monotonic() >= deadline:
@@ -170,6 +189,8 @@ class CodexClient:
                     open_streams -= 1
                     continue
                 if kind == "stderr":
+                    if line and not line.startswith("Reading additional input from stdin"):
+                        last_stderr = line[:500]
                     if line and on_event:
                         on_event({"type": "infrastructure.stderr", "message": line})
                     if line and "blocked by policy" in line.lower():
@@ -252,10 +273,16 @@ class CodexClient:
             with self._lock:
                 if self._process is process:
                     self._process = None
+            stdout_reader.join(timeout=1)
+            stderr_reader.join(timeout=1)
+            if process.stdout:
+                process.stdout.close()
+            if process.stderr:
+                process.stderr.close()
         if self._interrupted:
             outcome.error = "Codex turn interrupted"
         if outcome.exit_code != 0 and outcome.error is None:
-            outcome.error = f"Codex exited with status {outcome.exit_code}"
+            outcome.error = f"Codex exited with status {outcome.exit_code}" + (f": {last_stderr}" if last_stderr else "")
         if not outcome.completed and outcome.error is None:
             outcome.error = "Codex ended without turn.completed"
         return outcome

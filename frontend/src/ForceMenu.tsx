@@ -1,0 +1,4 @@
+import type { DebugVariable } from './debugStore'
+export function ForceMenu({ id, variable, x, y, enabled, canRelease, force, release }: { id: string; variable?: DebugVariable; x: number; y: number; enabled: boolean; canRelease: boolean; force: (value: boolean | string) => void; release: () => void }) {
+  return <div className="force-context-menu" role="menu" style={{ left: x, top: y }}><small>{id}</small>{variable?.type === 'BOOL' ? <><button role="menuitem" disabled={!enabled} onClick={() => force(true)}>Force TRUE</button><button role="menuitem" disabled={!enabled} onClick={() => force(false)}>Force FALSE</button></> : <button role="menuitem" disabled={!enabled} onClick={() => { const value = window.prompt(`Set forced value: ${id} (${variable?.type || 'unknown'})`); if (value !== null) force(value) }}>Set Value</button>}<button role="menuitem" disabled={!canRelease} onClick={release}>Unforce</button></div>
+}

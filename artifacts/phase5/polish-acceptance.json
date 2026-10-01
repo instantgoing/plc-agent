@@ -1,0 +1,132 @@
+{
+  "transport_disconnect": {
+    "type": "debug.values",
+    "timestamp": 1790429007228,
+    "runtime": "offline",
+    "interval_ms": 250,
+    "stale_after_ms": 1500,
+    "latest": {
+      "main.motortimer:et": {
+        "value": null,
+        "last_updated": 1790429005053,
+        "state": "unavailable"
+      },
+      "main:motor": {
+        "value": null,
+        "last_updated": 1790429005053,
+        "state": "unavailable"
+      },
+      "main:start": {
+        "value": null,
+        "last_updated": 1790429005053,
+        "state": "unavailable"
+      }
+    },
+    "values": {},
+    "forced": {},
+    "force_scope": "tool-observed",
+    "program": {
+      "build_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+      "source_hash": "5963df64fda033db0a08c85558c7e8fcf34077acea33c0c9314441c8c7e79112",
+      "runtime_hash": "c5811772c5bd3cb543a51b74540d6f9d",
+      "source_file": "C:\\Users\\\u5f20\u6668\u6d69\\AppData\\Local\\Temp\\tmpo6cohgzn\\Debug.st",
+      "loaded_at": "2026-09-26T12:34:53.215413+00:00"
+    },
+    "program_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+    "consistency": "matched",
+    "trace": {
+      "session_id": "05b58e71852d4dce9aa49c73e52e72b0",
+      "started_at": "2026-09-26T13:23:25.067831+00:00",
+      "sample_interval_ms": 100,
+      "signals": [
+        {
+          "variable_id": "main:start",
+          "type": "BOOL"
+        }
+      ],
+      "state": "interrupted",
+      "program_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+      "sample_count": 0,
+      "capacity": 10000,
+      "dropped_samples": 0
+    },
+    "poll_latency_ms": 2160.91
+  },
+  "trace_summary": {
+    "workspace": "C:\\Users\\\u5f20\u6668\u6d69\\AppData\\Local\\Temp\\tmpo6cohgzn",
+    "session_id": "f1fec7fd146c43c98b1f9c8405b44d50",
+    "started_at": "2026-09-26T13:23:34.416771+00:00",
+    "sample_interval_ms": 100,
+    "signals": [
+      {
+        "variable_id": "main:start",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:motor",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motortimer:et",
+        "type": "TIME"
+      }
+    ],
+    "state": "stopped",
+    "program_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+    "sample_count": 21,
+    "capacity": 10000,
+    "dropped_samples": 0,
+    "summary": {
+      "main:start": {
+        "transitions": [
+          {
+            "t_ms": 578,
+            "value": true
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": true,
+        "end": true
+      },
+      "main:motor": {
+        "transitions": [
+          {
+            "t_ms": 578,
+            "value": true
+          },
+          {
+            "t_ms": 3165,
+            "value": false
+          }
+        ],
+        "transition_count": 2,
+        "truncated": false,
+        "start": true,
+        "end": false
+      },
+      "main.motortimer:et": {
+        "min": 2560.0,
+        "max": 5000.0,
+        "start": 2560.0,
+        "end": 5000.0,
+        "samples": 21
+      }
+    }
+  },
+  "browser_long_tasks_ms": [],
+  "stop_cleanup": {
+    "success": true,
+    "state": "stopped"
+  },
+  "final_stop": {
+    "success": false,
+    "state": "error",
+    "actual_status": "running",
+    "error": {
+      "type": "infrastructure_error",
+      "message": "None"
+    }
+  },
+  "forced_remaining": {}
+}

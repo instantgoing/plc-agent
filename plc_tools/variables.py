@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import struct
+import math
+import os
 from dataclasses import asdict, dataclass
 
-from plc_tools.state import VariableEntry, load_variable_map
-from runtime.openplc import OpenPLCConfigurationError, run_debug_command
+from plc_tools.state import VariableEntry, load_variable_map, load_debug_state, record_forces, serialized_debug
+from runtime.openplc import OpenPLCConfigurationError, run_debug_command, runtime_program_hash
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,7 @@ class VariableValue:
     type: str
     index: int
     location: str
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -75,6 +78,8 @@ _SIZES = {
     "ULINT": 8,
     "LWORD": 8,
     "LREAL": 8,
+    # OpenPLC v4 bundled MatIEC ABI: int32 seconds + int32 nanoseconds.
+    "TIME": 8,
 }
 
 
@@ -111,6 +116,9 @@ def _decode(variable_type: str, value: bytes) -> bool | int | float | str:
         return struct.unpack("<f", value)[0]
     if kind == "LREAL":
         return struct.unpack("<d", value)[0]
+    if kind == "TIME":
+        seconds, nanos = struct.unpack("<ii", value)
+        return seconds * 1000 + nanos / 1_000_000
     signed = kind in {"SINT", "INT", "DINT", "LINT"}
     return int.from_bytes(value, "little", signed=signed)
 
@@ -135,8 +143,9 @@ def _parse_read_response(
             break
         value = _decode(variable.type, data[offset : offset + size])
         offset += size
-        result[variable.name] = VariableValue(
-            value, variable.type, variable.index, variable.location
+        key = variable.name if sum(v.name.casefold() == variable.name.casefold() for v in variables) == 1 else variable.id
+        result[key] = VariableValue(
+            value, variable.type, variable.index, variable.location, variable.id
         )
     return tick, result
 
@@ -157,13 +166,25 @@ def _serialize(variable_type: str, value: bool | int | float | str) -> bytes | N
         return None
     if kind in {"REAL", "LREAL"}:
         try:
+            if not math.isfinite(float(value)):
+                return None
             return struct.pack("<f" if kind == "REAL" else "<d", float(value))
         except (TypeError, ValueError, OverflowError):
+            return None
+    if kind == "TIME":
+        # TIME is expressed in milliseconds at the debug contract boundary.
+        try:
+            millis = float(value)
+            seconds = int(millis // 1000)
+            return struct.pack("<ii", seconds, round((millis - seconds * 1000) * 1_000_000))
+        except (TypeError, ValueError, OverflowError, struct.error):
             return None
     size = _SIZES.get(kind)
     if size is None:
         return None
     try:
+        if isinstance(value, float) and not value.is_integer():
+            return None
         numeric = int(value)
         signed = kind in {"SINT", "INT", "DINT", "LINT"}
         return numeric.to_bytes(size, "little", signed=signed)
@@ -174,26 +195,35 @@ def _serialize(variable_type: str, value: bool | int | float | str) -> bytes | N
 def _resolve(
     requested: list[str], variables: list[VariableEntry]
 ) -> tuple[list[VariableEntry], list[str]]:
-    by_name = {item.name.lower(): item for item in variables}
     resolved: list[VariableEntry] = []
     unresolved: list[str] = []
     for name in requested:
-        variable = by_name.get(name.lower())
-        if variable is None:
+        exact = [v for v in variables if v.id and v.id.casefold() == name.casefold()]
+        matches = exact or [v for v in variables if v.name.casefold() == name.casefold()
+                            or v.runtime_path.casefold() == name.casefold()]
+        if len(matches) != 1:
             unresolved.append(name)
         else:
-            resolved.append(variable)
+            if matches[0] not in resolved:
+                resolved.append(matches[0])
     return resolved, unresolved
 
 
+@serialized_debug
 def read_variables(names: list[str], *, timeout: float = 5.0) -> ReadVariablesResult:
     variable_map = load_variable_map()
     if not variable_map:
         return ReadVariablesResult(False, {}, names, tool_error="no variable map; run compile first")
-    targets, unresolved = _resolve(names or [item.name for item in variable_map], variable_map)
+    targets, unresolved = _resolve(names or [item.id or item.name for item in variable_map], variable_map)
+    unsupported = [v.id or v.name for v in targets if v.type.upper() not in _SIZES]
+    targets = [v for v in targets if v.type.upper() in _SIZES]
+    unresolved.extend(unsupported)
     if not targets:
         return ReadVariablesResult(True, {}, unresolved)
     try:
+        identity = load_debug_state().get("program")
+        if identity and identity.get("runtime_hash") and runtime_program_hash(timeout=timeout) != identity["runtime_hash"]:
+            return ReadVariablesResult(False, {}, unresolved, tool_error="Runtime program hash differs from compiled debug map")
         raw = run_debug_command(
             _build_read_command([item.index for item in targets]), timeout=timeout
         )
@@ -207,7 +237,15 @@ def read_variables(names: list[str], *, timeout: float = 5.0) -> ReadVariablesRe
     return ReadVariablesResult(True, values, unresolved, tick)
 
 
+@serialized_debug
 def force_variables(
+    values: dict[str, bool | int | float | str] | None = None,
+    *, release: list[str] | None = None, timeout: float = 5.0,
+) -> ForceVariablesResult:
+    return _force_variables(values, release=release, timeout=timeout)
+
+
+def _force_variables(
     values: dict[str, bool | int | float | str] | None = None,
     *,
     release: list[str] | None = None,
@@ -218,14 +256,23 @@ def force_variables(
     variable_map = load_variable_map()
     if not variable_map:
         return ForceVariablesResult(False, {}, [], [], "no variable map; run compile first")
-    by_name = {item.name.lower(): item for item in variable_map}
+    if os.environ.get("PLC_RUNTIME_ENVIRONMENT", "simulation") != "simulation":
+        return ForceVariablesResult(False, {}, [], [], "Level 3 force is disabled; simulation only")
+    identity = load_debug_state().get("program")
+    if identity and identity.get("runtime_hash"):
+        try:
+            if runtime_program_hash(timeout=timeout) != identity["runtime_hash"]:
+                return ForceVariablesResult(False, {}, [], [], "Runtime program hash differs from compiled debug map")
+        except OpenPLCConfigurationError as exc:
+            return ForceVariablesResult(False, {}, [], [], str(exc))
     forced: dict[str, bool | int | float | str] = {}
     released: list[str] = []
     failures: list[ForceFailure] = []
 
     operations: list[tuple[str, VariableEntry, int, bytes, bool | int | float | str | None]] = []
     for name, value in values.items():
-        variable = by_name.get(name.lower())
+        matched, _ = _resolve([name], variable_map)
+        variable = matched[0] if matched else None
         if variable is None:
             failures.append(ForceFailure(name, "variable not found"))
             continue
@@ -236,9 +283,10 @@ def force_variables(
         if encoded is None:
             failures.append(ForceFailure(name, f"cannot serialize value as {variable.type}"))
             continue
-        operations.append((variable.name, variable, 1, encoded, value))
+        operations.append((name, variable, 1, encoded, _decode(variable.type, encoded)))
     for name in release:
-        variable = by_name.get(name.lower())
+        matched, _ = _resolve([name], variable_map)
+        variable = matched[0] if matched else None
         if variable is None:
             failures.append(ForceFailure(name, "variable not found"))
             continue
@@ -246,7 +294,7 @@ def force_variables(
         if size is None:
             failures.append(ForceFailure(name, f"unsupported type {variable.type}"))
             continue
-        operations.append((variable.name, variable, 0, bytes(size), None))
+        operations.append((name, variable, 0, bytes(size), None))
 
     for name, variable, flag, encoded, original in operations:
         try:
@@ -264,6 +312,13 @@ def force_variables(
             failures.append(ForceFailure(name, f"runtime rejected force: {raw[:80]}"))
         elif flag == 1 and original is not None:
             forced[name] = original
+            record_forces({variable.id or variable.name: original}, [])
         else:
             released.append(name)
+            record_forces({}, [variable.id or variable.name])
     return ForceVariablesResult(not failures, forced, released, failures)
+
+
+def unforce_variables(variables: list[str], *, timeout: float = 5.0) -> ForceVariablesResult:
+    """Explicit release contract; never overload a force value with null."""
+    return force_variables({}, release=variables, timeout=timeout)

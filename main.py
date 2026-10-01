@@ -159,6 +159,12 @@ def build_parser() -> argparse.ArgumentParser:
     force_parser = subparsers.add_parser("force", help="force or release located variables")
     force_parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE")
     force_parser.add_argument("--release", action="append", default=[], metavar="NAME")
+    unforce_parser = subparsers.add_parser("unforce", help="release forced test Runtime variable IDs")
+    unforce_parser.add_argument("names", nargs="+")
+    trace_parser = subparsers.add_parser("trace", help="record a bounded real trace summary")
+    trace_parser.add_argument("names", nargs="+")
+    trace_parser.add_argument("--duration-ms", type=int, default=1000)
+    trace_parser.add_argument("--interval-ms", type=int, default=100)
 
     verify_parser = subparsers.add_parser("verify", help="run a real behavior test plan")
     verify_parser.add_argument("plan", type=Path)
@@ -184,6 +190,11 @@ def build_parser() -> argparse.ArgumentParser:
     chat_parser.add_argument("--max-attempts", type=int, default=5)
     chat_parser.add_argument("--max-actions", type=int, default=40)
 
+    web_parser = subparsers.add_parser("web", help="start the local PLC Web IDE")
+    web_parser.add_argument("--workspace", type=Path, default=Path.cwd())
+    web_parser.add_argument("--port", type=int, default=8765)
+    web_parser.add_argument("--dev", action="store_true", help="also start the Vite frontend")
+
     return parser
 
 
@@ -191,6 +202,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     from agent.env import load_project_env
     load_project_env(Path(__file__).resolve().parent)
+    if args.command == "web":
+        from web_ide.__main__ import serve
+        return serve(args.workspace, args.port, dev=args.dev)
     if args.command in {"agent", "chat"}:
         from agent.codex_cli import run_command
         return run_command(args)
@@ -216,6 +230,14 @@ def main(argv: list[str] | None = None) -> int:
         result = get_plc_status()
     elif args.command == "read":
         result = read_variables(args.names)
+    elif args.command == "unforce":
+        from plc_tools.variables import unforce_variables
+        result = unforce_variables(args.names)
+    elif args.command == "trace":
+        from plc_tools.mcp_adapter import PLCMCPAdapter
+        payload = PLCMCPAdapter(Path.cwd()).trace(args.names, args.duration_ms, args.interval_ms)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0 if payload["success"] else 1
     elif args.command == "force":
         values: dict[str, bool | int | float | str] = {}
         for assignment in args.set:

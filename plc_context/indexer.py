@@ -20,6 +20,8 @@ def _record(value: Any) -> dict[str, Any]:
     location = data.pop("location", None)
     if location:
         data.update(location)
+    if "scope" in data and "name" in data:
+        data["id"] = f"{data.get('owner') or 'GVL'}:{data['name']}".casefold()
     return data
 
 
@@ -196,7 +198,10 @@ class ProjectIndexer:
         if not query or match not in {"exact", "prefix", "substring"}:
             return {"success": False, "matches": [], "error": {"type": "invalid_argument", "message": "query and match are required"}}
         snapshot = self.snapshot()
-        symbols = self._matching_symbols(snapshot, query, match)
+        source_query = self._qualified_debug_query(snapshot, query)
+        symbols = self._matching_symbols(snapshot, source_query, match)
+        if query.casefold().startswith("gvl:"):
+            symbols = [s for s in symbols if s.get("scope") == "global"]
         return {"success": True, "complete": snapshot.complete, "query": query,
                 "match": match, "total": len(symbols), "matches": symbols[:limit]}
 
@@ -226,6 +231,8 @@ class ProjectIndexer:
 
     def find_references(self, symbol: str, *, limit: int = 100) -> dict[str, Any]:
         snapshot = self.snapshot()
+        global_query = symbol.casefold().startswith("gvl:")
+        symbol = self._qualified_debug_query(snapshot, symbol)
         declarations = self._matching_symbols(snapshot, symbol, "exact")
         qualified_owner = symbol.rsplit(".", 1)[0].casefold() if "." in symbol and not symbol.startswith("%") else None
         names = {item["name"].casefold() for item in declarations}
@@ -235,8 +242,32 @@ class ProjectIndexer:
         } if symbol.startswith("%") else None
         refs = [_record(item) for item in snapshot.references
                 if item.symbol.casefold() in names and
+                (not global_query or item.declaration_owner is None) and
                 (address_owners is None or
                  (item.symbol.casefold(), (item.declaration_owner or "").casefold()) in address_owners) and
                 (qualified_owner is None or (item.declaration_owner or "").casefold() == qualified_owner)]
         return {"success": True, "complete": snapshot.complete, "symbol": symbol,
                 "declarations": declarations, "total": len(refs), "references": refs[:limit]}
+
+    @staticmethod
+    def _qualified_debug_query(snapshot, query: str) -> str:
+        """Resolve a concrete debug instance ID to its source declaration."""
+        if ":" not in query:
+            return query
+        owner, name = query.rsplit(":", 1)
+        if owner.casefold() == "gvl":
+            return name
+        path = owner.split(".")
+        matches = [p for p in snapshot.pous if p.name.casefold() == path[0].casefold()]
+        if len(matches) != 1:
+            return query
+        pou = matches[0]
+        for instance in path[1:]:
+            variables = [v for v in pou.variables if v.name.casefold() == instance.casefold()]
+            if len(variables) != 1:
+                return query
+            matches = [p for p in snapshot.pous if p.name.casefold() == variables[0].type.casefold()]
+            if len(matches) != 1:
+                return query
+            pou = matches[0]
+        return f"{pou.name}.{name}"

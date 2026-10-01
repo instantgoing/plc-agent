@@ -1,0 +1,9 @@
+/* Specificity preserves the online dock size regardless of CSS import order. */
+.app-shell.app-shell { grid-template-rows: 48px minmax(0, 1fr) min(44vh, 440px) 27px; }
+.app-shell, .main-grid, .bottom-dock, .dock-content, .debug-workspace { min-width: 0; }
+.trace-plot { width: 100%; min-width: 0; }
+.force-context-menu { position: fixed; z-index: 20; background: #203128; border: 1px solid #668b74; padding: 5px; min-width: 170px; box-shadow: 0 5px 18px #0008; }
+.force-context-menu small { display: block; color: #92af9e; font-size: 9px; padding: 4px; }
+.force-context-menu button { display: block; width: 100%; text-align: left; padding: 7px; background: transparent; border: 0; color: #cde9d4; font-size: 11px; }
+.force-context-menu button:hover { background: #314e3d; }
+@media (max-height: 760px) { .app-shell.app-shell { grid-template-rows: 48px minmax(0, 1fr) 300px 27px; } }

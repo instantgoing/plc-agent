@@ -1,0 +1,309 @@
+{
+  "plc_find_references": {
+    "success": true,
+    "complete": true,
+    "symbol": "MAIN.motor",
+    "declarations": [
+      {
+        "name": "Motor",
+        "type": "BOOL",
+        "scope": "local",
+        "owner": "MAIN",
+        "address": "%QX0.0",
+        "initial_value": null,
+        "constant": false,
+        "located": true,
+        "file": "Debug.st",
+        "line": 16,
+        "column": 3,
+        "end_line": 16,
+        "end_column": 8,
+        "id": "main:motor",
+        "kind": "variable"
+      }
+    ],
+    "total": 1,
+    "references": [
+      {
+        "symbol": "Motor",
+        "owner": "MAIN",
+        "type": "variable",
+        "declaration_owner": "MAIN",
+        "file": "Debug.st",
+        "line": 37,
+        "column": 1,
+        "end_line": 37,
+        "end_column": 6
+      }
+    ]
+  },
+  "plc_start": {
+    "success": true,
+    "state": "running"
+  },
+  "plc_force": {
+    "success": true,
+    "applied": {
+      "main:start": true,
+      "main:stop": false,
+      "main:fault": false
+    },
+    "released": [],
+    "failures": []
+  },
+  "plc_read": {
+    "success": true,
+    "values": {
+      "main:start": true,
+      "main:motor": true,
+      "main.motor1:running": true,
+      "main.motor2:running": false
+    },
+    "variables": {
+      "start": {
+        "value": true,
+        "type": "BOOL",
+        "index": 0,
+        "location": "%IX0.0",
+        "id": "main:start"
+      },
+      "motor": {
+        "value": true,
+        "type": "BOOL",
+        "index": 3,
+        "location": "%QX0.0",
+        "id": "main:motor"
+      },
+      "motor1.running": {
+        "value": true,
+        "type": "BOOL",
+        "index": 18,
+        "location": "",
+        "id": "main.motor1:running"
+      },
+      "motor2.running": {
+        "value": false,
+        "type": "BOOL",
+        "index": 22,
+        "location": "",
+        "id": "main.motor2:running"
+      }
+    },
+    "timestamp": 1790430315875,
+    "scan": 52977,
+    "runtime": "running",
+    "forced": {
+      "main:start": true,
+      "main:stop": false,
+      "main:fault": false
+    },
+    "force_scope": "tool-observed",
+    "unresolved": [],
+    "program": {
+      "build_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+      "source_hash": "5963df64fda033db0a08c85558c7e8fcf34077acea33c0c9314441c8c7e79112",
+      "runtime_hash": "c5811772c5bd3cb543a51b74540d6f9d",
+      "source_file": "C:\\Users\\\u5f20\u6668\u6d69\\AppData\\Local\\Temp\\tmpo6cohgzn\\Debug.st",
+      "loaded_at": "2026-09-26T12:34:53.215413+00:00"
+    },
+    "program_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+    "consistency": "matched"
+  },
+  "plc_trace": {
+    "success": true,
+    "session_id": "5be67a15abb4462a80cca7a5892c8e58",
+    "started_at": "2026-09-26T13:45:15.889651+00:00",
+    "sample_interval_ms": 100,
+    "signals": [
+      {
+        "variable_id": "main:motor",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:speed",
+        "type": "REAL"
+      },
+      {
+        "variable_id": "main.motortimer:et",
+        "type": "TIME"
+      }
+    ],
+    "state": "stopped",
+    "program_id": "d2576b3a3cf24065b2e9172e8fd5d70e",
+    "sample_count": 5,
+    "capacity": 10000,
+    "dropped_samples": 0,
+    "samples": [
+      {
+        "t_ms": 122,
+        "timestamp": 1790430316008,
+        "values": {
+          "main:motor": true,
+          "main:speed": 12.5,
+          "main.motortimer:et": 440.0
+        }
+      },
+      {
+        "t_ms": 346,
+        "timestamp": 1790430316232,
+        "values": {
+          "main:motor": true,
+          "main:speed": 12.5,
+          "main.motortimer:et": 660.0
+        }
+      },
+      {
+        "t_ms": 594,
+        "timestamp": 1790430316480,
+        "values": {
+          "main:motor": true,
+          "main:speed": 12.5,
+          "main.motortimer:et": 900.0
+        }
+      },
+      {
+        "t_ms": 821,
+        "timestamp": 1790430316707,
+        "values": {
+          "main:motor": true,
+          "main:speed": 12.5,
+          "main.motortimer:et": 1140.0
+        }
+      },
+      {
+        "t_ms": 1040,
+        "timestamp": 1790430316926,
+        "values": {
+          "main:motor": true,
+          "main:speed": 12.5,
+          "main.motortimer:et": 1360.0
+        }
+      }
+    ]
+  },
+  "plc_unforce": {
+    "success": true,
+    "forced": {},
+    "released": [
+      "main:start",
+      "main:stop",
+      "main:fault"
+    ],
+    "failures": [],
+    "tool_error": null
+  },
+  "plc_verify": {
+    "success": true,
+    "passed": true,
+    "results": [
+      {
+        "step": 1,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": false,
+          "Stop": false,
+          "Fault": false
+        },
+        "expected": {
+          "Motor": false
+        },
+        "actual": {
+          "motor": false
+        }
+      },
+      {
+        "step": 2,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": true
+        },
+        "expected": {
+          "Motor": true,
+          "Motor1.Running": true,
+          "Motor2.Running": false
+        },
+        "actual": {
+          "motor": true,
+          "motor1.running": true,
+          "motor2.running": false
+        }
+      },
+      {
+        "step": 3,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Fault": true
+        },
+        "expected": {
+          "Motor": false
+        },
+        "actual": {
+          "motor": false
+        }
+      },
+      {
+        "step": 4,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Fault": false
+        },
+        "expected": {
+          "Motor": true
+        },
+        "actual": {
+          "motor": true
+        }
+      },
+      {
+        "step": 5,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {},
+        "expected": {
+          "Motor": false,
+          "MotorTimer.Q": true
+        },
+        "actual": {
+          "motor": false,
+          "motortimer.q": true
+        }
+      },
+      {
+        "step": 6,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": false
+        },
+        "expected": {
+          "Motor": false,
+          "MotorTimer.Q": false
+        },
+        "actual": {
+          "motor": false,
+          "motortimer.q": false
+        }
+      }
+    ],
+    "failures": [],
+    "cleanup_result": {
+      "success": true,
+      "forced": {},
+      "released": [
+        "Fault",
+        "Start",
+        "Stop"
+      ],
+      "failures": [],
+      "tool_error": null
+    }
+  },
+  "plc_stop": {
+    "success": true,
+    "state": "stopped"
+  }
+}

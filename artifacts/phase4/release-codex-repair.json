@@ -1,0 +1,22 @@
+{
+  "initial_check_success": false,
+  "initial_diagnostics_present": true,
+  "completed_tools": [
+    "plc_check",
+    "plc_project_context",
+    "plc_find_symbol",
+    "plc_find_references",
+    "plc_check",
+    "plc_compile",
+    "plc_start",
+    "plc_verify",
+    "plc_unforce",
+    "plc_stop"
+  ],
+  "verify_tool_summary": "passed",
+  "agent_state": "verified",
+  "changed_files": [
+    "broken.st"
+  ],
+  "runtime_after": "stopped"
+}

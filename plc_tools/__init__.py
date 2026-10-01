@@ -8,6 +8,7 @@ from .variables import (
     ReadVariablesResult,
     force_variables,
     read_variables,
+    unforce_variables,
 )
 from .verify import VerifyResult, verify_file, verify_plan
 
@@ -25,6 +26,7 @@ __all__ = [
     "get_plc_status",
     "force_variables",
     "read_variables",
+    "unforce_variables",
     "start_plc",
     "stop_plc",
     "verify_file",

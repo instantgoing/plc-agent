@@ -215,6 +215,60 @@ check/compile tools still accept one ST file at a time. Set `--project-root`
 to one PLC project; the index includes all ST files below that root, including
 fixtures if the repository root is used.
 
+## Phase 4 local Web IDE
+
+The browser workbench uses React, TypeScript, Vite, and a locally bundled Monaco
+Editor. Python FastAPI serves a localhost HTTP/WebSocket gateway. It calls the
+existing `CodexPLCSession`, Phase 2 PLC adapter, and Phase 3 project index; the
+browser does not connect directly to the filesystem, compiler, or Runtime.
+
+```powershell
+python -m pip install -r requirements-phase4.txt
+cd frontend
+npm ci
+npm run build
+cd ..
+python main.py web --workspace .
+```
+
+Open `http://127.0.0.1:8765`. For Vite development, use the one-command entry
+`python main.py web --workspace . --dev` and open `http://127.0.0.1:5173`.
+The server binds only to `127.0.0.1`. It uses the configured MatIEC/OpenPLC
+test environment; physical PLC operations are unavailable. The Codex CLI must
+be installed and authenticated separately. Health reports service readiness,
+and a Codex turn can be interrupted from the Agent panel.
+
+If Codex is authenticated but a turn stalls after `thread.started` and
+`turn.started`, check outbound access to OpenAI. When this machine requires a
+local HTTP proxy, set `PLC_CODEX_PROXY=http://127.0.0.1:PORT` in `.env.local`
+and restart the Web IDE. This setting applies only to the Codex child process;
+the browser, PLC tools, and localhost Runtime keep their own connections.
+For automatic startup of an existing local proxy application, also set
+`PLC_CODEX_PROXY_EXECUTABLE="ABSOLUTE_PATH_TO_PROXY_EXECUTABLE"`. The gateway
+launches it only if the configured localhost proxy port is unavailable, then
+waits up to 10 seconds. It reuses the running proxy and leaves this shared
+application running when the Web IDE exits. An unavailable proxy produces a
+clear Agent error and leaves the editor usable. No system proxy settings are
+changed.
+
+The Web IDE has Files/PLC explorers, ST editing and save conflicts,
+compiler Problems, simulation Runtime and live variables, Codex event streaming,
+sessions, and before/after Changes. Terminal remains deferred. See
+[`docs/phase4-current-state.md`](docs/phase4-current-state.md) for the P1–P3
+inventory and [`docs/phase4-progress.md`](docs/phase4-progress.md) for verified
+P4 capabilities. The remaining ten-second auto-stop and compiler-error repair
+browser scenarios passed real Chromium/MatIEC/OpenPLC acceptance on 2026-10-01.
+
+## Phase 5 online debugger
+
+Watch, Variables and read-only Live Ladder now share one DebugSession and
+batch-read WebSocket updates. Stable scope/instance IDs, acknowledged Force /
+Unforce, Force Overview, bounded Trace with digital/numeric plots, summaries,
+and native Runtime program-hash checks support actual simulator debugging.
+Source changes and stale/offline observations disable live highlighting.
+See [the Phase 5 audit](docs/phase5-current-state.md) and
+[the result and acceptance report](docs/phase5-result.md).
+
 ## Legacy M5 single-Agent bounded repair loop (inactive CLI path)
 
 The following material documents the former M5 implementation. Its CLI

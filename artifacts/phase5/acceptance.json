@@ -1,0 +1,462 @@
+{
+  "compile": {
+    "success": true,
+    "program": {
+      "build_id": "93c4f2248ce146e8b2759ee10ba66390",
+      "source_hash": "e2f96d936154c7ad7a538413d21eb18df01b3c1ee5b3f977b721dd370970d854",
+      "runtime_hash": "95f27c2d131b0efa429f8840f188438a",
+      "source_file": "C:\\Users\\张晨浩\\AppData\\Local\\Temp\\tmpo6cohgzn\\Debug.st",
+      "loaded_at": "2026-09-26T12:01:58.057831+00:00"
+    },
+    "duration_ms": 0
+  },
+  "trace_summary": {
+    "session_id": "e3108a9bb475433b86683c01ef34efa4",
+    "started_at": "2026-09-26T12:32:09.882454+00:00",
+    "sample_interval_ms": 100,
+    "signals": [
+      {
+        "variable_id": "main:start",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:stop",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:fault",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:motor",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motortimer:q",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motortimer:et",
+        "type": "TIME"
+      },
+      {
+        "variable_id": "main.motor1:running",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motor2:running",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:level",
+        "type": "INT"
+      },
+      {
+        "variable_id": "main:speed",
+        "type": "REAL"
+      }
+    ],
+    "state": "stopped",
+    "program_id": "93c4f2248ce146e8b2759ee10ba66390",
+    "sample_count": 16,
+    "capacity": 10000,
+    "dropped_samples": 0,
+    "summary": {
+      "main:start": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": true
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": true,
+        "end": true
+      },
+      "main:stop": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": false
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": false,
+        "end": false
+      },
+      "main:fault": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": false
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": false,
+        "end": false
+      },
+      "main:motor": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": true
+          },
+          {
+            "t_ms": 5186,
+            "value": false
+          }
+        ],
+        "transition_count": 2,
+        "truncated": false,
+        "start": true,
+        "end": false
+      },
+      "main.motortimer:q": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": false
+          },
+          {
+            "t_ms": 5186,
+            "value": true
+          }
+        ],
+        "transition_count": 2,
+        "truncated": false,
+        "start": false,
+        "end": true
+      },
+      "main.motortimer:et": {
+        "min": 660.0,
+        "max": 5000.0,
+        "start": 660.0,
+        "end": 5000.0,
+        "samples": 16
+      },
+      "main.motor1:running": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": true
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": true,
+        "end": true
+      },
+      "main.motor2:running": {
+        "transitions": [
+          {
+            "t_ms": 808,
+            "value": false
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": false,
+        "end": false
+      },
+      "main:level": {
+        "min": 96,
+        "max": 370,
+        "start": 96,
+        "end": 370,
+        "samples": 16
+      },
+      "main:speed": {
+        "min": 12.5,
+        "max": 12.5,
+        "start": 12.5,
+        "end": 12.5,
+        "samples": 16
+      }
+    }
+  },
+  "performance": [
+    {
+      "variables": 10,
+      "poll_mean_ms": 286.39250000000004,
+      "poll_max_ms": 573.97,
+      "host_python_cpu_percent": 9.03145236667297
+    },
+    {
+      "variables": 50,
+      "poll_mean_ms": 350.55125,
+      "poll_max_ms": 573.44,
+      "host_python_cpu_percent": 12.26911793067814
+    },
+    {
+      "variables": 100,
+      "poll_mean_ms": 368.545,
+      "poll_max_ms": 630.83,
+      "host_python_cpu_percent": 16.305695036446384
+    }
+  ],
+  "verify": {
+    "success": true,
+    "passed": true,
+    "results": [
+      {
+        "step": 1,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": false,
+          "Stop": false,
+          "Fault": false
+        },
+        "expected": {
+          "Motor": false
+        },
+        "actual": {
+          "motor": false
+        }
+      },
+      {
+        "step": 2,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": true
+        },
+        "expected": {
+          "Motor": true,
+          "Motor1.Running": true,
+          "Motor2.Running": false
+        },
+        "actual": {
+          "motor": true,
+          "motor1.running": true,
+          "motor2.running": false
+        }
+      },
+      {
+        "step": 3,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Fault": true
+        },
+        "expected": {
+          "Motor": false
+        },
+        "actual": {
+          "motor": false
+        }
+      },
+      {
+        "step": 4,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Fault": false
+        },
+        "expected": {
+          "Motor": true
+        },
+        "actual": {
+          "motor": true
+        }
+      },
+      {
+        "step": 5,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {},
+        "expected": {
+          "Motor": false,
+          "MotorTimer.Q": true
+        },
+        "actual": {
+          "motor": false,
+          "motortimer.q": true
+        }
+      },
+      {
+        "step": 6,
+        "passed": true,
+        "time_ms": 0,
+        "inputs": {
+          "Start": false
+        },
+        "expected": {
+          "Motor": false,
+          "MotorTimer.Q": false
+        },
+        "actual": {
+          "motor": false,
+          "motortimer.q": false
+        }
+      }
+    ],
+    "failures": [],
+    "cleanup_result": {
+      "success": true,
+      "forced": {},
+      "released": [
+        "Fault",
+        "Start",
+        "Stop"
+      ],
+      "failures": [],
+      "tool_error": null
+    }
+  },
+  "browser_trace_summary": {
+    "session_id": "ea5d87b9f70846c6a91493a46965fac9",
+    "started_at": "2026-09-26T12:32:48.606198+00:00",
+    "sample_interval_ms": 100,
+    "signals": [
+      {
+        "variable_id": "main:start",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:motor",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main:fault",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motor1:running",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motor2:running",
+        "type": "BOOL"
+      },
+      {
+        "variable_id": "main.motortimer:et",
+        "type": "TIME"
+      }
+    ],
+    "state": "stopped",
+    "program_id": "93c4f2248ce146e8b2759ee10ba66390",
+    "sample_count": 26,
+    "capacity": 10000,
+    "dropped_samples": 0,
+    "summary": {
+      "main:start": {
+        "transitions": [
+          {
+            "t_ms": 139,
+            "value": true
+          },
+          {
+            "t_ms": 1220,
+            "value": false
+          },
+          {
+            "t_ms": 1989,
+            "value": true
+          }
+        ],
+        "transition_count": 3,
+        "truncated": false,
+        "start": true,
+        "end": true
+      },
+      "main:motor": {
+        "transitions": [
+          {
+            "t_ms": 139,
+            "value": true
+          },
+          {
+            "t_ms": 1220,
+            "value": false
+          },
+          {
+            "t_ms": 1989,
+            "value": true
+          },
+          {
+            "t_ms": 6698,
+            "value": false
+          }
+        ],
+        "transition_count": 4,
+        "truncated": false,
+        "start": true,
+        "end": false
+      },
+      "main:fault": {
+        "transitions": [
+          {
+            "t_ms": 139,
+            "value": false
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": false,
+        "end": false
+      },
+      "main.motor1:running": {
+        "transitions": [
+          {
+            "t_ms": 139,
+            "value": true
+          },
+          {
+            "t_ms": 1220,
+            "value": false
+          },
+          {
+            "t_ms": 1989,
+            "value": true
+          }
+        ],
+        "transition_count": 3,
+        "truncated": false,
+        "start": true,
+        "end": true
+      },
+      "main.motor2:running": {
+        "transitions": [
+          {
+            "t_ms": 139,
+            "value": false
+          }
+        ],
+        "transition_count": 1,
+        "truncated": false,
+        "start": false,
+        "end": false
+      },
+      "main.motortimer:et": {
+        "min": 0.0,
+        "max": 5000.0,
+        "start": 1340.0,
+        "end": 5000.0,
+        "samples": 26
+      }
+    }
+  },
+  "agent_answer": "我会先定位符号及引用，再一次读取 MAIN 的 Start、Stop、Fault、Motor 实时值，结合源码说明原因。全程只读，不改变 Runtime 状态。\n\n**当前电机输出未接通的明确原因是 Fault=TRUE，故障联锁阻止启动。**\n\n已先完成符号及引用查找，再用一次 `plc_read` 读取四个稳定 ID：\n\n| 稳定 ID | 实际值 | 强制状态 |\n|---|---|---|\n| `main:start` | TRUE | 强制 TRUE |\n| `main:stop` | FALSE | 未报告强制 |\n| `main:fault` | TRUE | 强制 TRUE |\n| `main:motor` | FALSE | 未报告强制 |\n\n[Debug.st 第 37 行](/C:/Users/张晨浩/AppData/Local/Temp/tmpo6cohgzn/Debug.st:37) 的逻辑为：\n```iecst\nMotor := Start AND NOT Stop AND NOT Fault AND NOT MotorTimer.Q;\n```\n虽然启动信号有效、停止信号未动作，但 `NOT Fault=FALSE`，足以使 `Motor=FALSE`。程序还有 5 秒定时联锁，本次未读取定时器状态，不能判断它是否同时阻断输出。\n\n本次快照时间戳为 `1790426051211`，扫描号 `832412`；Runtime 正在运行，源码一致性为 `matched`。最新 Fault 值与旧 IDE 观察不同，应以本次读取为准。\n\n未修改源码、编译或启停 Runtime，也未改变已有强制值。",
+  "frontend_performance": {
+    "editor_mutations": 1744,
+    "long_tasks_ms": []
+  },
+  "browser_errors": [],
+  "cleanup": {
+    "released": {
+      "success": false,
+      "forced": {},
+      "released": [],
+      "failures": [],
+      "tool_error": "OpenPLC debug socket failed: HTTP Error 500: INTERNAL SERVER ERROR"
+    },
+    "stopped": {
+      "success": true,
+      "state": "stopped"
+    }
+  }
+}

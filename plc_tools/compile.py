@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from plc_tools.check import Diagnostic, _parse_diagnostics
-from plc_tools.state import VariableEntry, parse_variable_map, save_variable_map
+from plc_tools.state import VariableEntry, parse_variable_map, save_variable_map, program_identity, serialized_debug, load_debug_state
 from runtime.openplc import (
     OpenPLCConfigurationError,
     compile_program,
@@ -55,6 +55,7 @@ def _tool_failure(message: str) -> CompileResult:
     return CompileResult(False, None, [], [], [], None, [], [], message)
 
 
+@serialized_debug
 def compile_st(source_path: str | Path, *, timeout: float = 90.0) -> CompileResult:
     """Compile ST, upload it, and wait for the Runtime's real GCC result."""
 
@@ -62,6 +63,7 @@ def compile_st(source_path: str | Path, *, timeout: float = 90.0) -> CompileResu
     if not source.is_file():
         return _tool_failure(f"ST source does not exist: {source}")
     try:
+        source_bytes = source.read_bytes()
         st_code = source.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         return _tool_failure(f"cannot read ST source as UTF-8: {exc}")
@@ -101,6 +103,16 @@ def compile_st(source_path: str | Path, *, timeout: float = 90.0) -> CompileResu
                                    fragment_fallback=False)
 
     try:
+        known = list(load_debug_state().get("forced", {}))
+        if known:
+            from plc_tools.variables import _force_variables
+            cleanup = _force_variables({}, release=known)
+            if not cleanup.success:
+                return _tool_failure("cannot replace program before releasing known forces: " +
+                                     (cleanup.tool_error or "; ".join(f.reason for f in cleanup.failures)))
+        # Upload failure may already have replaced the runtime program. Fail
+        # closed until a complete successful build establishes a new identity.
+        save_variable_map([])
         uploaded = upload_program(compiled.package_path, timeout=timeout)
     except OpenPLCConfigurationError as exc:
         return _tool_failure(str(exc))
@@ -117,7 +129,12 @@ def compile_st(source_path: str | Path, *, timeout: float = 90.0) -> CompileResu
             variables,
             uploaded.error,
         )
-    save_variable_map(variables)
+    try:
+        if source.read_bytes() != source_bytes:
+            return _tool_failure("source changed during compilation; debug map invalidated")
+    except OSError as exc:
+        return _tool_failure(f"source unavailable after compilation; debug map invalidated: {exc}")
+    save_variable_map(variables, identity=program_identity(source, st_code))
     return CompileResult(
         True,
         None,

@@ -61,7 +61,17 @@ def create_server(project_root: str | Path) -> MCPServer:
     def plc_force(variables: dict[str, bool | int | float | str], release: list[str] | None = None) -> dict[str, Any]:
         return report("plc_force", adapter.force(variables, release))
 
-    @server.tool(description="Level 0. Batch read named variables from the test Runtime.", structured_output=True)
+    @server.tool(description="Level 2. Explicitly release tool-observed forced test Runtime variable IDs.", structured_output=True)
+    def plc_unforce(variables: list[str]) -> dict[str, Any]:
+        return report("plc_unforce", adapter.unforce(variables))
+
+    @server.tool(description="Level 1. Record a bounded real runtime trace; returns transition/min/max summary first. Use action=summary or range for the last temporary trace.", structured_output=True)
+    def plc_trace(variables: list[str] | None = None, duration_ms: int = 1000,
+                  sample_interval_ms: int = 100, action: str = "record",
+                  start_ms: int = 0, end_ms: int | None = None) -> dict[str, Any]:
+        return report("plc_trace", adapter.trace(variables, duration_ms, sample_interval_ms, action, start_ms, end_ms))
+
+    @server.tool(description="Level 0. Batch debug snapshot by stable variable IDs; returns real values, scan, timestamp, program identity, source consistency and tool-observed forces. Ambiguous simple names are refused.", structured_output=True)
     def plc_read(variables: list[str]) -> dict[str, Any]:
         return report("plc_read", adapter.read(variables))
 

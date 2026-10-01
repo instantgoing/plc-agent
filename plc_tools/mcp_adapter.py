@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import time
+import os
+import json
+import urllib.parse
+import urllib.request
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from plc_context import ProjectIndexer
+from plc_tools.debug import debug_snapshot, program_state, TraceBuffer
+from plc_tools.state import load_debug_state, load_variable_map
+from plc_tools.variables import _resolve, _SIZES, unforce_variables
 from plc_tools import (
     check_st, compile_st, force_variables, read_variables, start_plc, stop_plc,
     verify_file,
@@ -27,6 +34,7 @@ class PLCMCPAdapter:
             raise ValueError("project_root must be a directory")
         self.context_index = ProjectIndexer(self.root)
         self.context_index.snapshot()
+        self.trace_buffer = TraceBuffer()
 
     def _file(self, file: str, *, suffix: str) -> tuple[Path | None, dict[str, Any] | None]:
         if not isinstance(file, str) or not file.strip() or "\x00" in file:
@@ -48,10 +56,10 @@ class PLCMCPAdapter:
             "success": True, "project_root": str(self.root), "source_files": files,
             "runtime": "openplc", "compiler": "matiec",
             "capabilities": {"check": True, "compile": True, "run": True,
-                             "force": True, "read": True, "trace": False, "verify": True},
+                             "force": True, "unforce": True, "read": True, "trace": True, "verify": True},
             "safety_levels": {"project_info": 0, "check": 0, "read": 0,
-                              "compile": 1, "start": 2, "stop": 2,
-                              "force": 2, "verify": 2, "real_plc": 3},
+                              "compile": 1, "trace": 1, "start": 2, "stop": 2,
+                              "force": 2, "unforce": 2, "verify": 2, "real_plc": 3},
         }
 
     def project_context(self, detail: str = "summary", limit: int = 100,
@@ -102,6 +110,7 @@ class PLCMCPAdapter:
             "runtime_logs": result.runtime_logs,
             "generated_files": result.generated_files,
             "variables": [asdict(item) for item in result.variables],
+            **program_state(self.root),
         }
         if not result.success:
             kind = "infrastructure_error" if result.tool_error else "compiler_error"
@@ -153,19 +162,56 @@ class PLCMCPAdapter:
     def read(self, variables: list[str]) -> dict[str, Any]:
         if not isinstance(variables, list) or not variables or not all(isinstance(x, str) and x for x in variables):
             return {"success": False, "values": {}, "error": _error("invalid_argument", "variables must be a nonempty list of names")}
-        result = read_variables(variables)
-        by_lower = {name.lower(): item for name, item in result.variables.items()}
-        payload: dict[str, Any] = {"success": result.success and not result.unresolved_names,
-                                   "values": {name: by_lower[name.lower()].value for name in variables if name.lower() in by_lower},
-                                   "variables": {name: asdict(item) for name, item in result.variables.items()}}
-        if result.tick is not None:
-            payload["scan"] = result.tick
-        if result.tool_error:
-            kind = "runtime_not_running" if "not running" in result.tool_error.lower() else "read_failed"
-            payload["error"] = _error(kind, result.tool_error)
-        elif result.unresolved_names:
-            payload["error"] = _error("unknown_variable", "variable not found", variable=result.unresolved_names[0])
-        return payload
+        return debug_snapshot(variables, self.root)
+
+    def unforce(self, variables: list[str]) -> dict:
+        if not isinstance(variables, list) or not variables or not all(isinstance(v, str) for v in variables):
+            return {"success": False, "error": _error("invalid_argument", "provide variable IDs")}
+        return unforce_variables(variables).to_dict()
+
+    def trace(self, variables: list[str] | None = None, duration_ms: int = 1000,
+              sample_interval_ms: int = 100, action: str = "record",
+              start_ms: int = 0, end_ms: int | None = None) -> dict:
+        trace_url = os.environ.get("PLC_DEBUG_GATEWAY_URL")
+        if action in {"summary", "range"} and trace_url and self.trace_buffer.session_id is None:
+            parsed = urllib.parse.urlparse(trace_url)
+            if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"} or parsed.username or parsed.password:
+                return {"success": False, "error": _error("invalid_argument", "debug gateway must be local")}
+            query = {"summary": "true"} if action == "summary" else {"start_ms": start_ms}
+            if end_ms is not None and action == "range":
+                query["end_ms"] = end_ms
+            try:
+                with urllib.request.urlopen(trace_url.rstrip("/") + "/api/debug/trace?" + urllib.parse.urlencode(query), timeout=3) as response:
+                    selected = json.load(response)
+                if Path(selected.get("workspace", "")).resolve() != self.root:
+                    raise ValueError("trace belongs to another workspace")
+                return {"success": True, **selected}
+            except (OSError, ValueError) as exc:
+                return {"success": False, "error": _error("trace_unavailable", str(exc))}
+        if action == "summary":
+            return {"success": True, **self.trace_buffer.summary()}
+        if action == "range":
+            return {"success": True, **self.trace_buffer.data(start_ms, end_ms)}
+        if action != "record" or not 100 <= duration_ms <= 30000:
+            return {"success": False, "error": _error("invalid_argument", "record duration must be 100-30000ms")}
+        targets, missing = _resolve(variables or [], load_variable_map())
+        if missing or not targets or any(v.type not in _SIZES for v in targets):
+            return {"success": False, "error": _error("unknown_variable", "trace requires resolved supported signals")}
+        try:
+            self.trace_buffer.start([{"variable_id": v.id or v.name, "type": v.type} for v in targets],
+                                    sample_interval_ms, program_state(self.root)["program_id"])
+        except ValueError as exc:
+            return {"success": False, "error": _error("invalid_argument", str(exc))}
+        deadline = time.monotonic() + duration_ms / 1000
+        while time.monotonic() < deadline:
+            result = self.read([s["variable_id"] for s in self.trace_buffer.signals])
+            if not result.get("success") or result["program_id"] != self.trace_buffer.program_id:
+                self.trace_buffer.stop("interrupted")
+                return {"success": False, **self.trace_buffer.summary(), "error": result.get("error")}
+            self.trace_buffer.append(result["values"], result["timestamp"])
+            time.sleep(sample_interval_ms / 1000)
+        self.trace_buffer.stop()
+        return {"success": True, **self.trace_buffer.summary()}
 
     def verify(self, file: str) -> dict[str, Any]:
         path, error = self._file(file, suffix=".json")

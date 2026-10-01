@@ -1,0 +1,263 @@
+{
+  "success": true,
+  "passed": true,
+  "results": [
+    {
+      "step": 1,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false,
+        "Stop": true
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 2,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Stop": false
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 3,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": true
+      },
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 4,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false
+      },
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 5,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Stop": true
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 6,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": true
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 7,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Stop": false
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 8,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 9,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": true
+      },
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 10,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {},
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 11,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {},
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 12,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {},
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 13,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 14,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": true
+      },
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 15,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false
+      },
+      "expected": {
+        "Motor": true
+      },
+      "actual": {
+        "motor": true
+      }
+    },
+    {
+      "step": 16,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Stop": true
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 17,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {},
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    },
+    {
+      "step": 18,
+      "passed": true,
+      "time_ms": 0,
+      "inputs": {
+        "Start": false,
+        "Stop": false
+      },
+      "expected": {
+        "Motor": false
+      },
+      "actual": {
+        "motor": false
+      }
+    }
+  ],
+  "failures": [],
+  "cleanup_result": {
+    "success": true,
+    "forced": {},
+    "released": [
+      "Start",
+      "Stop"
+    ],
+    "failures": [],
+    "tool_error": null
+  }
+}
