@@ -2,6 +2,10 @@
 
 Cross-platform PLC programming agent for IEC 61131-3 Structured Text.
 
+Clone with `git clone --recurse-submodules` if you also want to run the
+historical M5 tests. For an existing clone, run `git submodule update --init`.
+The active Codex/Web IDE path does not import that historical dependency.
+
 The project is intentionally being built in small, verified milestones:
 
 `natural language -> ST -> MatIEC -> C -> GCC/OpenPLC Runtime -> force/read/trace -> behavior verification`
