@@ -7,3 +7,11 @@ frontend/.npm-cache/
 frontend/dist/
 frontend/*.tsbuildinfo
 artifacts/
+
+# Local CortexIDE renderer profile and intermediate visual iterations.
+reference/cortexide/profile/
+reference/ours/pass*/
+reference/ours/diff-pass*/
+reference/ours/final/
+reference/ours/diff-final/
+reference/ours/00-before.png

@@ -1,0 +1,20 @@
+{
+  "panelResizePx": [
+    300,
+    346
+  ],
+  "sidebarResizePx": [
+    300,
+    350
+  ],
+  "tabLabels": [
+    "ST\nmotor_start_stop.st\n\u00d7",
+    "ST\nminimal.st\n\u00d7"
+  ],
+  "tabCount": 2,
+  "fileContextMenuVisible": true,
+  "multilineInput": true,
+  "emptySendDisabled": true,
+  "focusShortcut": true,
+  "commandPalette": true
+}

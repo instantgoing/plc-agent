@@ -151,15 +151,18 @@ class Gateway:
     def scan_changes(self, source: str = "external") -> None:
         with self._snapshot_lock:
             now = self.workspace.snapshot()
+            st_changed = False
             for path in sorted(self._last_snapshot.keys() | now.keys()):
                 if self._last_snapshot.get(path) == now.get(path):
                     continue
+                st_changed |= path.lower().endswith(".st")
                 original = self._before.get(path, self._last_snapshot.get(path, ""))
                 self._changes[path] = {"path": path, "source": source, "before": original,
                                        "after": now.get(path, "")}
                 self._publish({"type": "file.changed", "path": path, "source": source})
             self._last_snapshot = now
-        self.debug.invalidate_source()
+        if st_changed:
+            self.debug.invalidate_source()
 
     def changes(self) -> list[dict]:
         with self._snapshot_lock:

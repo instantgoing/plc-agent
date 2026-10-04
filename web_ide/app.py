@@ -16,13 +16,34 @@ from pydantic import BaseModel
 from agent.env import load_project_env
 from plc_tools import get_plc_status
 from web_ide.service import Gateway
-from web_ide.workspace import WorkspaceConflict, WorkspaceError
+from web_ide.workspace import WorkspaceConflict, WorkspaceError, WorkspaceHiddenContents
 
 
 class SaveFile(BaseModel):
     path: str
     content: str
     expected_version: str
+
+
+class CreateItem(BaseModel):
+    parent: str = ""
+    name: str
+    kind: str
+
+
+class TransferItem(BaseModel):
+    source: str
+    parent: str = ""
+    name: str | None = None
+
+
+class DeleteItem(BaseModel):
+    path: str
+    confirm_hidden: bool = False
+
+
+class RestoreItem(BaseModel):
+    undo_token: str
 
 
 class Message(BaseModel):
@@ -109,6 +130,9 @@ def create_app(workspace: str | Path) -> FastAPI:
         return await call_next(request)
 
     def file_error(exc: Exception) -> HTTPException:
+        if isinstance(exc, WorkspaceHiddenContents):
+            return HTTPException(409, {"type": "hidden_contents", "message": str(exc),
+                                       "hidden_count": exc.count})
         if isinstance(exc, WorkspaceConflict):
             return HTTPException(409, {"type": "workspace_conflict", "message": str(exc)})
         if isinstance(exc, FileNotFoundError):
@@ -147,6 +171,51 @@ def create_app(workspace: str | Path) -> FastAPI:
             saved = gateway.workspace.save(body.path, body.content, body.expected_version)
             gateway.scan_changes("user")
             return saved
+        except (WorkspaceError, FileNotFoundError) as exc:
+            raise file_error(exc) from exc
+
+    @app.post("/api/workspace/create")
+    def create_item(body: CreateItem) -> dict:
+        try:
+            result = gateway.workspace.create(body.parent, body.name, body.kind)
+            gateway.scan_changes("user")
+            return result
+        except (WorkspaceError, FileNotFoundError) as exc:
+            raise file_error(exc) from exc
+
+    @app.post("/api/workspace/move")
+    def move_item(body: TransferItem) -> dict:
+        try:
+            result = gateway.workspace.move(body.source, body.parent, body.name)
+            gateway.scan_changes("user")
+            return result
+        except (WorkspaceError, FileNotFoundError) as exc:
+            raise file_error(exc) from exc
+
+    @app.post("/api/workspace/copy")
+    def copy_item(body: TransferItem) -> dict:
+        try:
+            result = gateway.workspace.copy(body.source, body.parent, body.name)
+            gateway.scan_changes("user")
+            return result
+        except (WorkspaceError, FileNotFoundError) as exc:
+            raise file_error(exc) from exc
+
+    @app.post("/api/workspace/delete")
+    def delete_item(body: DeleteItem) -> dict:
+        try:
+            result = gateway.workspace.delete(body.path, confirm_hidden=body.confirm_hidden)
+            gateway.scan_changes("user")
+            return result
+        except (WorkspaceError, FileNotFoundError) as exc:
+            raise file_error(exc) from exc
+
+    @app.post("/api/workspace/restore")
+    def restore_item(body: RestoreItem) -> dict:
+        try:
+            result = gateway.workspace.restore(body.undo_token)
+            gateway.scan_changes("user")
+            return result
         except (WorkspaceError, FileNotFoundError) as exc:
             raise file_error(exc) from exc
 

@@ -1,0 +1,37 @@
+{
+  "viewport": {"width": 1440, "height": 900, "unit": "CSS px"},
+  "state": "01-main-shell.png, banner closed, Explorer and Chat visible, bottom panel hidden",
+  "rects": {
+    "titleBar": {"x": 0, "y": 0, "width": 1440, "height": 35},
+    "activityBar": {"x": 0, "y": 35, "width": 48, "height": 843},
+    "primarySidebar": {"x": 48, "y": 35, "width": 300, "height": 843},
+    "editor": {"x": 348, "y": 35, "width": 792, "height": 843},
+    "secondarySidebar": {"x": 1140, "y": 35, "width": 300, "height": 843},
+    "statusBar": {"x": 0, "y": 878, "width": 1440, "height": 22},
+    "explorerHeader": {"x": 48, "y": 70, "width": 299, "height": 32},
+    "explorerFirstRow": {"x": 48, "y": 102, "width": 299, "height": 22},
+    "chatPane": {"x": 1141, "y": 70, "width": 299, "height": 808},
+    "chatComposer": {"x": 1153, "y": 102, "width": 275, "height": 118.203125},
+    "chatTextarea": {"x": 1164, "y": 113, "width": 159, "height": 61}
+  },
+  "bottomPanelState": {"source": "09-bottom-panel.json", "panel": {"x": 348, "y": 578, "width": 792, "height": 300}},
+  "resizingState": {"source": "16-resized.png", "sidebarWidthBefore": 300, "sidebarWidthAfter": 343, "dragStartX": 347, "dragEndX": 390},
+  "sourceBounds": {
+    "activityBarWidthPx": 48,
+    "activityBarCompactWidthPx": 36,
+    "activityActionHeightPx": 48,
+    "activityIconSizePx": 24,
+    "sidebarMinimumWidthPx": 170,
+    "secondarySidebarMinimumWidthPx": 170,
+    "panelMinimumWidthPx": 300,
+    "panelMinimumHeightPx": 77,
+    "initialSidebarsApproxPx": 300
+  },
+  "sourceFiles": [
+    "../cortexide-reference/src/vs/workbench/browser/layout.ts",
+    "../cortexide-reference/src/vs/workbench/browser/parts/activitybar/activitybarPart.ts",
+    "../cortexide-reference/src/vs/workbench/browser/parts/sidebar/sidebarPart.ts",
+    "../cortexide-reference/src/vs/workbench/browser/parts/auxiliarybar/auxiliaryBarPart.ts",
+    "../cortexide-reference/src/vs/workbench/browser/parts/panel/panelPart.ts"
+  ]
+}

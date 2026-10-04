@@ -1,0 +1,6 @@
+{
+  "runningCaptured": true,
+  "toolCollapsedCaptured": true,
+  "toolExpandedCaptured": true,
+  "agentText": "You\nRead examples/motor_start_stop.st and find the declaration of Motor. Do not edit files, run shell commands, compile, start a PLC, or force variables.\n›\nConnecting to Codex\n›\nCodex local proxy is ready.\n›\nCodex turn started\n●\n我会通过 PLC MCP 查找 `Motor`，并读取对应源码位置确认声明。\n\nplc_project_info\nRunning\nWaiting for tool result…\nAgent is working…\nInterrupt"
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from .model import (
 from .st_adapter import parse_st
 
 
-_EXCLUDED = {".git", ".plc-agent", ".venv", "smolagents", "__pycache__"}
+_EXCLUDED = {".git", ".plc-agent", ".venv", "node_modules", "smolagents", "__pycache__"}
 
 
 def _record(value: Any) -> dict[str, Any]:
@@ -55,12 +56,17 @@ class ProjectIndexer:
         self.parse_count = 0
 
     def _paths(self, pattern: str) -> list[Path]:
-        return sorted(
-            path for path in self.root.rglob(pattern)
-            if path.is_file() and path.resolve().is_relative_to(self.root)
-            and not any(part in _EXCLUDED or part.startswith(".venv")
-                        for part in path.relative_to(self.root).parts)
-        )
+        paths = []
+        for directory, names, files in os.walk(self.root, topdown=True, followlinks=False):
+            names[:] = [name for name in names
+                        if name not in _EXCLUDED and not name.startswith(".venv")
+                        and not (Path(directory) / name).is_symlink()]
+            for name in files:
+                path = Path(directory) / name
+                if (path.match(pattern) and path.is_file()
+                        and path.resolve().is_relative_to(self.root)):
+                    paths.append(path)
+        return sorted(paths)
 
     def snapshot(self) -> PLCProjectSnapshot:
         paths = self._paths("*.st")

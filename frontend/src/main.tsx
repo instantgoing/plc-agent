@@ -4,7 +4,10 @@ import { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import App from './App'
+import './design-tokens.css'
 import './styles.css'
+import './ui-adjustments.css'
+import './workbench.css'
 
 loader.config({ monaco })
 self.MonacoEnvironment = {

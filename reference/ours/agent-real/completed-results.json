@@ -1,0 +1,10 @@
+{
+  "toolCount": 4,
+  "toolNames": [
+    "plc_project_info\ncompleted",
+    "plc_find_symbol\ncompleted",
+    "list_mcp_resources\ncompleted",
+    "list_mcp_resource_templates\ncompleted"
+  ],
+  "completed": true
+}

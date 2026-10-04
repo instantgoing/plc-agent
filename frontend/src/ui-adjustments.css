@@ -1,0 +1,195 @@
+.app-shell.app-shell {
+  height: 100dvh;
+  grid-template-rows: 48px minmax(220px, 1fr) 8px clamp(160px, var(--dock-height), calc(100dvh - 307px)) 31px;
+  font-size: 13px;
+}
+
+.main-grid.main-grid {
+  display: flex;
+  grid-template-columns: none;
+  min-width: 0;
+}
+
+.main-grid .sidebar {
+  order: 1;
+  flex: 0 1 var(--sidebar-width);
+  min-width: 180px;
+}
+
+.main-grid .editor-zone {
+  order: 3;
+  flex: 1 1 auto;
+  min-width: 300px;
+}
+
+.main-grid .agent-panel {
+  order: 5;
+  flex: 0 1 var(--agent-width);
+  min-width: 280px;
+}
+
+.panel-splitter {
+  position: relative;
+  flex: 0 0 8px;
+  background: #1c282c;
+  touch-action: none;
+  outline: none;
+}
+
+.panel-splitter::after {
+  content: '';
+  position: absolute;
+  background: #526760;
+  border-radius: 2px;
+}
+
+.panel-splitter:hover::after,
+.panel-splitter:focus-visible::after,
+.panel-splitter.active::after {
+  background: #8de3b2;
+}
+
+.panel-splitter:focus-visible {
+  box-shadow: inset 0 0 0 2px #8de3b2;
+}
+
+.panel-splitter-sidebar,
+.panel-splitter-agent {
+  cursor: col-resize;
+}
+
+.panel-splitter-sidebar {
+  order: 2;
+}
+
+.panel-splitter-agent {
+  order: 4;
+}
+
+.panel-splitter-sidebar::after,
+.panel-splitter-agent::after {
+  top: 44%;
+  left: 3px;
+  width: 2px;
+  height: 12%;
+}
+
+.panel-splitter-dock {
+  cursor: row-resize;
+}
+
+.panel-splitter-dock::after {
+  top: 3px;
+  left: 44%;
+  width: 12%;
+  height: 2px;
+}
+
+.app-shell.is-resizing {
+  user-select: none;
+}
+
+.app-shell.agent-hidden .agent-panel,
+.app-shell.agent-hidden .panel-splitter-agent {
+  display: none;
+}
+
+.agent-reopen {
+  background: #25342e;
+  border: 1px solid #496652;
+  border-radius: 4px;
+  color: #bfdec6;
+  font-size: 11px;
+  padding: 5px 9px;
+}
+
+.agent-head-actions .agent-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.agent-reopen:hover,
+.agent-head-actions .agent-close:hover {
+  background: #2d3f42;
+  color: #eff8f3;
+}
+
+.app-shell :is(.brand strong, .workspace-name, .agent-head strong) {
+  font-size: 14px;
+}
+
+.app-shell :is(.tree-folder summary, .tree-file, .plc-group summary, .plc-group button,
+  .editor-actions button, .tab > button:first-child, .agent-empty, .agent-row,
+  .agent-compose textarea, .problem-list button, .changes-panel button,
+  .runtime-controls button, .panel-controls button, .watch-search input,
+  .variables-panel, .debug-warning, .ladder-element span,
+  .editor-welcome p, .editor-welcome > div:not(.welcome-logo),
+  .variables-panel td button, .watch-matches button, .ladder-timer) {
+  font-size: 13px;
+}
+
+.app-shell :is(.side-head, .segmented button, .section-title, .editor-label,
+  .agent-head small, .agent-compose button, .dock-tabs button, .empty-panel,
+  .debug-toolbar, .debug-toolbar button, .debug-toolbar select,
+  .trace-panel button, .trace-panel select, .watch-search button,
+  .runtime-panel strong, .panel-controls strong, .statusbar,
+  .uplot, .u-legend .u-series, .empty-tabs, .agent-head-actions select,
+  .agent-working, .agent-working button, .force-context-menu button) {
+  font-size: 12px;
+}
+
+.app-shell :is(.brand small, .sim-badge, .header-status, .side-foot,
+  .plc-group button small, .editor-actions kbd, .agent-compose span,
+  .operation-label, .variables-panel th, .variables-panel td small,
+  .debug-toolbar small, .debug-state, .ladder-caption, .rung-source,
+  .ladder-unsupported, .ladder-panel > small, .working-label,
+  .force-context-menu small) {
+  font-size: 11px;
+}
+
+.app-shell .tree-file,
+.app-shell .plc-group button {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.app-shell .agent-compose textarea {
+  height: 86px;
+}
+
+.app-shell .dock-tabs {
+  height: 42px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.app-shell .dock-tabs button {
+  flex: 0 0 auto;
+  padding: 0 12px;
+}
+
+.app-shell .runtime-panel,
+.app-shell .runtime-controls {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .main-grid .sidebar {
+    min-width: 145px;
+  }
+
+  .main-grid .editor-zone {
+    min-width: 240px;
+  }
+
+  .main-grid .agent-panel,
+  .panel-splitter-agent {
+    display: none;
+  }
+
+  .agent-reopen {
+    display: none;
+  }
+}

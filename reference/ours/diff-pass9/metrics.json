@@ -1,0 +1,31 @@
+{
+  "01-main-shell": {
+    "rawMismatchPercentThreshold20": 4.53,
+    "meanAbsoluteChannelDifference": 4.86,
+    "editorBlankMismatchPercentThreshold20": 1.43
+  },
+  "02-sidebar": {
+    "rawMismatchPercentThreshold20": 5.32,
+    "meanAbsoluteChannelDifference": 5.45
+  },
+  "03-editor": {
+    "rawMismatchPercentThreshold20": 6.37,
+    "meanAbsoluteChannelDifference": 5.56
+  },
+  "04-agent-empty": {
+    "rawMismatchPercentThreshold20": 6.37,
+    "meanAbsoluteChannelDifference": 5.56
+  },
+  "05-agent-typing": {
+    "rawMismatchPercentThreshold20": 6.7,
+    "meanAbsoluteChannelDifference": 6.14
+  },
+  "09-bottom-panel": {
+    "rawMismatchPercentThreshold20": 6.92,
+    "meanAbsoluteChannelDifference": 6.85
+  },
+  "10-sidebar-collapsed": {
+    "rawMismatchPercentThreshold20": 4.9,
+    "meanAbsoluteChannelDifference": 4.9
+  }
+}

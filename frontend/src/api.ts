@@ -3,12 +3,19 @@ export type FileData = { path: string; content: string; version: string }
 export type Diagnostic = { file: string; line: number; column: number; end_line?: number; end_column?: number; severity: string; message: string; code?: string | null }
 export type WebEvent = { type: string; seq?: number; [key: string]: unknown }
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly detail: Record<string, unknown> | null) {
+    super(message)
+  }
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } })
   const data = await response.json()
   if (!response.ok) {
     const detail = data.detail
-    throw new Error(typeof detail === 'string' ? detail : detail?.message || `${response.status} ${response.statusText}`)
+    throw new ApiError(typeof detail === 'string' ? detail : detail?.message || `${response.status} ${response.statusText}`,
+      response.status, detail && typeof detail === 'object' ? detail : null)
   }
   return data as T
 }

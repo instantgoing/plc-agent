@@ -1,0 +1,33 @@
+# CortexIDE interaction rules
+
+## Navigation and focus
+
+| Trigger | Result | Evidence |
+| --- | --- | --- |
+| Activity action | Switch workbench view; CortexIDE chat lives in auxiliary bar and opens after restoration. | [sidebarPane.ts](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/sidebarPane.ts#L105), [sidebarPane.ts](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/sidebarPane.ts#L166) |
+| `Ctrl/Cmd+L` | Open/focus chat and stage current editor selection or file when available. | [sidebarActions.ts](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/sidebarActions.ts#L90) |
+| `Ctrl/Cmd+Shift+L` | Start new thread and focus composer. | [sidebarActions.ts](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/sidebarActions.ts#L183) |
+| Explorer/editor context menu | Add File to Chat stages target and focuses chat. | [sidebarActions.ts](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/sidebarActions.ts#L366) |
+| Thread header | New chat, toggle bounded history, open settings in center editor. | [ThreadHeader.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/chrome/ThreadHeader.tsx#L24), [SidebarChat.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/SidebarChat.tsx#L307) |
+| Thread tab | Switch thread; close that tab; show running spinner. | [ComposerTabs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/chrome/ComposerTabs.tsx#L35) |
+
+## Composer and stream lifecycle
+
+1. The textarea starts at one row, auto-grows, and scrolls after a 500px cap. `@` opens a context picker; the picker has an explicit no-results state ([inputs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/util/inputs.tsx#L826), [inputs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/util/inputs.tsx#L923)).
+2. Enter submits unless Shift is held or IME composition is active. Shift+Enter adds a newline. Escape aborts a running response. Empty/disabled and running states switch send to stop ([SidebarChat.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/SidebarChat.tsx#L207), [inputs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/util/inputs.tsx#L864), [VoidChatArea.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/VoidChatArea.tsx#L454)).
+3. Images and PDFs can be selected, pasted or dropped. Accepted drag changes composer border/background. Validation errors appear near attachments; staged context chips are removable ([VoidChatArea.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/VoidChatArea.tsx#L239), [ComposerInputArea.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/ComposerInputArea.tsx#L73)).
+4. Valid submit clears input and attachments optimistically, retains submitted selections, and refocuses input ([SidebarChat.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/SidebarChat.tsx#L145)).
+5. Preparing/generating shows text, animation and Escape hint. The timeline auto-scrolls while the reader is near its bottom; if they scroll away, it preserves their position. The near-bottom threshold is 4px ([ChatMessageList.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/ChatMessageList.tsx#L112), [ScrollToBottomContainer.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/ScrollToBottomContainer.tsx#L17)).
+6. Failures appear inline with dismiss/recovery and a settings path. Changed-file work has separate Needs Approval, Preparing/Running and Done states plus accept/reject controls ([ChatMessageList.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/ChatMessageList.tsx#L148), [CommandBarInChat.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/composer/CommandBarInChat.tsx#L39)).
+
+## Pointer and keyboard states
+
+- Hover reveals secondary controls, brightens clickable tool targets and slightly raises landing quick actions. Active tabs combine filled surface, border and text; inactive tabs remain muted ([ComposerTabs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/chrome/ComposerTabs.tsx#L42), [QuickActionsBar.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/landing/QuickActionsBar.tsx#L26)).
+- `:focus-visible` creates a branded outline; composer `:focus-within` strengthens its border/ring. Disabled buttons dim and change cursor ([cortexide.css](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/media/cortexide.css#L365), [styles.css](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/styles.css#L324), [styles.css](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/styles.css#L419)).
+- Tool headers respond to Enter/Space. Chat tabs have `role=tab` and `aria-selected`, but this component does not show roving focus or arrow-key handling. Complete those semantics during adaptation instead of copying them mechanically ([ToolHeader.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/tools/ToolHeader.tsx#L99), [ComposerTabs.tsx](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/react/src/sidebar-tsx/chrome/ComposerTabs.tsx#L35)).
+
+## Resize and scroll
+
+Workbench grid resize persists region sizes. Chat has separate scroll owners: horizontal tabs, optional history, conversation timeline and tall composer. Scoped chat scrollbars are thin (6px vertical, 4px horizontal in WebKit), with stronger hover thumb ([layout.ts](../../../cortexide-reference/src/vs/workbench/browser/layout.ts#L1668), [cortexide.css](../../../cortexide-reference/src/vs/workbench/contrib/cortexide/browser/media/cortexide.css#L325)).
+
+For PLC-Agent, adapt shortcuts to browser/host conflicts and preserve IME behavior. Keep tool progress separate from test Runtime state. Only present behavior as verified after a real `passed: true` result; CortexIDE's edit approval controls do not authorize physical PLC writes.

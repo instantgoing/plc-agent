@@ -58,6 +58,42 @@ class WebIDETests(unittest.TestCase):
             self.assertEqual(client.put("/api/workspace/file", headers={"Origin": "https://attacker.example"},
                                         json={"path": "src/Main.st", "content": "changed", "expected_version": "x"}).status_code, 403)
 
+    def test_explorer_create_copy_move_delete_and_restore(self):
+        with TestClient(self.app) as client:
+            created = client.post("/api/workspace/create", json={"parent": "", "name": "new", "kind": "folder"})
+            self.assertEqual(created.status_code, 200)
+            self.assertIn("new", [node["name"] for node in client.get("/api/workspace/tree").json()["nodes"]])
+            file = client.post("/api/workspace/create", json={"parent": "new", "name": "Main.st", "kind": "file"})
+            self.assertEqual(file.json()["path"], "new/Main.st")
+            self.assertEqual(client.get("/api/workspace/file", params={"path": "new/Main.st"}).json()["content"], "")
+            duplicate = client.post("/api/workspace/copy", json={"source": "src/Main.st", "parent": "src"})
+            self.assertEqual(duplicate.json()["path"], "src/Main copy.st")
+            moved = client.post("/api/workspace/move", json={"source": "src/Main copy.st", "parent": "new",
+                                                             "name": "Copied.st"})
+            self.assertEqual(moved.json()["path"], "new/Copied.st")
+            deleted = client.post("/api/workspace/delete", json={"path": "new/Copied.st"})
+            self.assertEqual(deleted.status_code, 200)
+            self.assertFalse((self.root / "new" / "Copied.st").exists())
+            restored = client.post("/api/workspace/restore", json={"undo_token": deleted.json()["undo_token"]})
+            self.assertEqual(restored.json()["path"], "new/Copied.st")
+            self.assertEqual((self.root / "new" / "Copied.st").read_text(encoding="utf-8"), ST)
+
+    def test_explorer_rejects_collisions_traversal_and_hidden_folder_contents(self):
+        with TestClient(self.app) as client:
+            self.assertEqual(client.post("/api/workspace/create", json={"parent": "src", "name": "Main.st", "kind": "file"}).status_code, 409)
+            self.assertEqual(client.post("/api/workspace/create", json={"parent": "", "name": "script.py", "kind": "file"}).status_code, 400)
+            self.assertEqual(client.post("/api/workspace/create", json={"parent": "", "name": "../escape.st", "kind": "file"}).status_code, 400)
+            self.assertEqual(client.post("/api/workspace/move", json={"source": "src", "parent": "src"}).status_code, 400)
+            (self.root / "src" / "not-shown.py").write_text("hidden from the UI", encoding="utf-8")
+            blocked = client.post("/api/workspace/delete", json={"path": "src"})
+            self.assertEqual(blocked.status_code, 409)
+            self.assertEqual(blocked.json()["detail"]["type"], "hidden_contents")
+            self.assertTrue((self.root / "src" / "Main.st").exists())
+            deleted = client.post("/api/workspace/delete", json={"path": "src", "confirm_hidden": True})
+            self.assertEqual(deleted.status_code, 200)
+            client.post("/api/workspace/restore", json={"undo_token": deleted.json()["undo_token"]})
+            self.assertTrue((self.root / "src" / "not-shown.py").exists())
+
     def test_context_and_health(self):
         with TestClient(self.app) as client:
             context = client.get("/api/project/context?detail=pous").json()
@@ -125,6 +161,15 @@ class WebIDETests(unittest.TestCase):
             diff = client.get("/api/changes/diff", params={"path": "src/Main.st"}).json()
             self.assertIn("FALSE", diff["before"])
             self.assertIn("TRUE", diff["after"])
+
+    def test_unchanged_workspace_does_not_invalidate_debug_catalog(self):
+        gateway = self.app.state.gateway
+        with patch.object(gateway.debug, "invalidate_source") as invalidate:
+            gateway.scan_changes()
+            invalidate.assert_not_called()
+            (self.root / "src" / "Main.st").write_text(ST.replace("FALSE", "TRUE"), encoding="utf-8")
+            gateway.scan_changes()
+            invalidate.assert_called_once_with()
 
     def test_agent_event_stream_and_thread_resume(self):
         gateway = self.app.state.gateway
