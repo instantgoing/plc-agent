@@ -1,431 +1,135 @@
-# plc-agent
+# PLC-Agent
 
-Cross-platform PLC programming agent for IEC 61131-3 Structured Text.
+[简体中文](README.md) | [English](README.en.md)
 
-Clone with `git clone --recurse-submodules` if you also want to run the
-historical M5 tests. For an existing clone, run `git submodule update --init`.
-The active Codex/Web IDE path does not import that historical dependency.
+PLC-Agent 是一个面向 IEC 61131-3 结构化文本（ST）的本地开发工具。它提供浏览器工作台、Codex Agent、PLC 工程静态索引，以及基于 MatIEC 和 OpenPLC 测试 Runtime 的编译、仿真调试与行为验证。
 
-The project is intentionally being built in small, verified milestones:
+项目目前面向**本地仿真和测试**，不支持连接、下载程序到或控制物理 PLC。
 
-`natural language -> ST -> MatIEC -> C -> GCC/OpenPLC Runtime -> force/read/trace -> behavior verification`
+![PLC-Agent Web IDE：工程文件树与 ST 编辑器](reference/ours/pass9/03-editor.png)
 
-M1 runs a real MatIEC `iec2c` compiler and returns structured diagnostics. M2
-adds a real, pinned OpenPLC Runtime. M3 forces and reads real debug variables,
-and M4 executes declarative behavior plans against the running scan cycle.
+## 功能
 
-## M0 research and M1 compiler verification
+- **Web IDE**：浏览和编辑 ST 文件，查看编译诊断、工程结构、Agent 执行过程与文件变更。
+- **Codex Agent**：在工程内理解需求、修改 ST，并通过 PLC MCP 工具检查和验证结果；可从 Web IDE 或命令行使用。
+- **仿真调试**：在 OpenPLC 测试 Runtime 中运行程序，读取变量，Force/Unforce，记录有界 Trace，查看只读 Live Ladder。
+- **行为验证**：用 JSON 测试计划设置输入并断言实际输出。只有真实运行的 `passed: true` 才表示该计划通过；编译成功不等于行为正确。
 
-Read [docs/research.md](docs/research.md) for the compatibility decision and
-[docs/architecture.md](docs/architecture.md) for the layer boundaries.
+## 环境要求
 
-With MatIEC installed and available as `iec2c`:
+| 用途 | 所需环境 |
+| --- | --- |
+| Web IDE | Python 3、Node.js 与 npm；安装 `requirements-phase4.txt` 和前端依赖 |
+| ST 检查 | MatIEC `iec2c`，可使用项目提供的 Docker 编译器镜像，或配置本机/WSL 编译器 |
+| 仿真、调试和行为验证 | Docker Engine、Docker Compose，以及项目固定版本的 OpenPLC 测试 Runtime；需要支持 `linux/amd64` 容器 |
+| Agent | 已安装并认证的 Codex CLI，以及访问模型服务的网络连接 |
+
+Windows 安装 `requirements-phase4.txt` 中的 Tree-sitter ST 语法包时可能需要 C 编译工具链。镜像构建会下载固定版本的 MatIEC、OpenPLC 和其他依赖。项目曾在 Windows 主机及 Docker Linux 容器上完成真实验收；其他主机环境仍需自行验证。
+
+## 快速开始
+
+以下命令在仓库根目录执行。示例使用 PowerShell；macOS/Linux 的虚拟环境激活命令见下文。
+
+### 1. 下载并安装
 
 ```powershell
-python main.py check examples/minimal.st
-python main.py check examples/invalid.st
+git clone https://github.com/instantgoing/plc-agent.git
+cd plc-agent
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-phase4.txt
+cd frontend
+npm ci
+npm run build
+cd ..
 ```
 
-The same tool boundary can use the M1 Docker image instead of a host compiler:
+macOS/Linux 激活命令是 `source .venv/bin/activate`。直接下载 GitHub ZIP 也可安装当前 Web IDE；若需运行历史 M5 测试，请改用 `git clone --recurse-submodules` 获取 `smolagents` 子模块。当前 Codex/Web IDE 不依赖该子模块。
+
+### 2. 启动 Web IDE
+
+```powershell
+python main.py web --workspace .
+```
+
+打开 <http://127.0.0.1:8765>。服务只监听本机。`--workspace` 应指向要编辑的 PLC 工程目录；使用仓库根目录时，工程索引也会包含 `examples/` 和 `tests/` 中的 ST 文件。开发前端时可用 `python main.py web --workspace . --dev`，然后打开 <http://127.0.0.1:5173>。
+
+此时可以浏览和编辑文件。要执行检查、仿真或 Agent 任务，还需完成下面的环境配置。
+
+### 3. 配置 MatIEC 与 OpenPLC 测试 Runtime
+
+启动 Docker，然后在仓库根目录构建项目提供的编译器和 Runtime 镜像：
 
 ```powershell
 docker compose -f runtime/docker-compose.m1.yml build
-$env:PLC_MATIEC_DOCKER_IMAGE = "plc-agent-matiec:m1"
-python main.py check examples/minimal.st
-```
-
-The compiler can be configured without changing Python code:
-
-```powershell
-$env:PLC_MATIEC_BIN = "iec2c"
-$env:PLC_MATIEC_LIB = "C:/path/to/matiec/lib"
-```
-
-On Windows, an installed WSL distribution can run a Linux MatIEC release too:
-
-```powershell
-$env:PLC_MATIEC_BACKEND = "wsl"
-$env:PLC_MATIEC_WSL_DISTRO = "Ubuntu"
-$env:PLC_MATIEC_WSL_BIN = "/path/to/matiec/iec2c"
-$env:PLC_MATIEC_WSL_LIB = "/path/to/matiec/lib"
-python main.py check examples/minimal.st
-```
-
-A missing or unusable compiler is reported separately as `tool_error`; it is
-never silently replaced by a parser or mock.
-
-Run the dependency-free unit suite with:
-
-```powershell
-python -m unittest discover -s tests -v
-```
-
-Set `PLC_MATIEC_INTEGRATION=1` alongside a configured real backend to include
-the valid/invalid compiler integration tests.
-
-## M2 OpenPLC Runtime
-
-Build the MatIEC-compatible OpenPLC base from its pinned commit, then build and
-start the M2 container:
-
-```powershell
 python runtime/scripts/build_openplc_base.py
 docker compose -f runtime/docker-compose.m2.yml build
 docker compose -f runtime/docker-compose.m2.yml up -d
 ```
 
-Compile, load, and start a real scan cycle:
+在仓库根目录创建不提交到 Git 的 `.env.local`，写入：
 
-```powershell
-python main.py run examples/runtime_minimal.st
-python main.py status
-python main.py stop
+```dotenv
+PLC_MATIEC_BACKEND=docker
+PLC_MATIEC_DOCKER_IMAGE=plc-agent-matiec:m1
 ```
 
-The M2 integration test is opt-in because it requires the real container:
+如已安装本机或 WSL MatIEC，可改用其他后端；配置项见 [Runtime 说明](runtime/README.md)。运行 `python main.py check examples/minimal.st` 可先确认真实编译器可用。
 
-```powershell
-$env:PLC_OPENPLC_INTEGRATION = "1"
-python -m unittest tests.test_openplc_integration -v
-```
+### 4. 配置 Codex Agent（可选）
 
-Docker, MatIEC command lines, generated artifact paths, TLS/authentication, and
-OpenPLC REST details remain behind `runtime/`; callers only use `plc_tools`.
-
-## M3 variables and M4 verification
-
-After compiling and starting a program with located variables:
-
-```powershell
-python main.py read Start Motor
-python main.py force --set Start=true
-python main.py read Start Motor
-python main.py force --set Start=false --release Start
-```
-
-Run a declarative behavior plan after loading its matching program:
-
-```powershell
-python main.py run examples/problem_001_solution.st
-python main.py verify problems/problem_001/tests.json
-python main.py stop
-```
-
-Variable access uses the Runtime's authenticated Socket.IO debug protocol.
-`plc_verify` applies inputs, waits for a scan, reads actual outputs, reports
-expected-versus-actual failures, and releases every forced input in `finally`.
-
-## Current status
-
-- M0: research recorded.
-- M1: complete. The public `plc_check` contract invokes real MatIEC and returns
-  structured file/line/column/range diagnostics. Valid and invalid ST were
-  executed against MatIEC v4.0.11 under WSL on 2026-09-09.
-- M2: complete. `plc_compile` runs MatIEC v4.0.11, packages the generated C,
-  uploads it to the pinned MatIEC-era OpenPLC Runtime, waits for real GCC/link
-  success, and `plc_start` confirms a stable `RUNNING` scan cycle. The real
-  compile/load/start/stop integration test passed on 2026-09-17.
-- M3: complete. A real `Start` force crossed an advancing PLC scan cycle and
-  produced a real `Motor` output read through the OpenPLC debug protocol on
-  2026-09-18.
-- M4: complete. The three-case `problem_001/tests.json` plan passed against the
-  real Runtime on 2026-09-18, including automatic force cleanup.
-- M5: complete. On 2026-09-20, a real DeepSeek tool-calling model generated a
-  motor-control candidate that passed real MatIEC checking, OpenPLC Runtime
-  GCC/link, scan-cycle execution, and all five behavior assertions. The
-  Runtime was stopped after verification.
-- M6-M7: not started.
-
-M4 now proves behavior only for the explicit tested cases. Compilation or
-runtime startup alone still never implies program correctness.
-
-## Phase 1 Codex migration
-
-`python main.py agent` and `python main.py chat` now enter Codex CLI, not the
-smolagents loop. Codex needs its own authentication (`codex login` or
-`CODEX_API_KEY`); the previous `PLC_AGENT_API_KEY` is not Codex authentication.
+安装 Codex CLI 并运行 `codex login`，或按 Codex CLI 的方式设置 `CODEX_API_KEY`。完成后可在 Web IDE 右侧 Agent 面板提问，也可使用：
 
 ```powershell
 python main.py agent --workspace . "检查当前 PLC 工程，并说明主要程序结构。"
 python main.py chat --workspace .
 ```
 
-The workspace keeps its Codex thread ID in `.plc-agent/codex-session.json`, so
-the next turn resumes the same engineering context. Codex edits files in that
-workspace and invokes the existing `main.py check/compile/start/force/read/verify/stop`
-commands. Command and file events stream to the terminal. ST edits without a
-successful real `verify` result are reported as unverified. The CLI limits
-check/compile attempts to five and command executions to forty per turn by
-default. The previous model-specific flags and `--output` export are no longer
-part of this entrypoint.
+如当前网络需要本地 HTTP 代理，可在 `.env.local` 设置 `PLC_CODEX_PROXY=http://127.0.0.1:PORT` 并重启 Web IDE。旧版 M5 的 `PLC_AGENT_API_KEY` 不是当前 Codex 入口的认证方式。
 
-The real Codex acceptance tasks passed on the MatIEC/OpenPLC test Runtime.
-The old M5 implementation and its vendored source remain only for historical
-tests; `requirements-m5.txt` no longer installs smolagents. The active CLI
-does not import or initialize the old Agent. Acceptance evidence is recorded in
-[docs/phase1-acceptance.md](docs/phase1-acceptance.md).
+## 基本使用
 
-## Phase 2 PLC MCP tools
+Web IDE 左侧选择文件或 PLC 符号，中间编辑 ST，右侧使用 Agent，底部查看 Problems、Runtime、Variables、Watch、Trace、Live Ladder 和 Changes。先保存 ST，再执行 Check 或 Build & Run；仿真程序运行后才能读取实时变量和开始调试。
 
-Install the MCP transport dependency with `python -m pip install -r
-requirements-phase2.txt`. Start the standalone stdio server from the project
-root with `python -m plc_tools.mcp_server --project-root .`. The server logs to
-stderr and reserves stdout for MCP messages.
-
-The local Codex CLI can register `plc_mcp.py` as a stdio server. Use absolute
-paths for both the launcher and project root when registering it outside this
-repository; for example, `codex mcp add plc -- python ABSOLUTE_PATH_TO_plc_mcp.py
---project-root ABSOLUTE_PROJECT_ROOT`. `python main.py agent/chat` supplies a
-workspace-scoped MCP configuration to its own Codex turn automatically.
-
-Available tools: `plc_project_info`, `plc_check`, `plc_compile`, `plc_start`,
-`plc_stop`, `plc_force`, `plc_read`, and `plc_verify`. They call the existing
-`plc_tools` core, just like `main.py`; `plc_trace` has no stable implementation
-and is not exposed. File arguments must name files inside the configured
-project root. Compile loads the test Runtime and reports `artifact: null`
-because there is no durable standalone artifact path. A verify result with
-`success: true, passed: false` means the real test ran and an assertion failed.
-
-See [docs/phase2-acceptance.md](docs/phase2-acceptance.md) for the tool schemas,
-safety levels, Codex acceptance, and real test results. Physical PLC operations
-are not available.
-
-## Phase 3 PLC project context
-
-Install `requirements-phase3.txt` for the ST Tree-sitter grammar and MCP server.
-The grammar package currently ships as source on PyPI, so Windows installation
-needs a C build toolchain. `plc_project_info` remains compatible with Phase 2.
-The server also exposes three Level 0 static context tools:
-
-- `plc_project_context(detail="summary")` returns counts and incomplete files.
-  Other details include `files`, `pous`, `globals`, `data_types`, `tasks`, `io`,
-  `references`, and `tests`. List sections accept `limit` and `offset`.
-- `plc_find_symbol(query="FB_Motor", match="exact")` locates declarations by
-  exact, prefix, or substring name. An I/O address such as `%QX0.0` is also a
-  valid exact query. Names can be ambiguous; results include owner and source
-  location.
-- `plc_find_references(symbol="FB_Motor")` returns declarations and resolved
-  source references. Qualified variable names such as `FB_Motor.Running` narrow
-  member lookups.
-
-`plc_context/` builds an in-memory snapshot from ST source and reparses only
-files whose modification time or size changed. It reports parser errors per
-file and keeps the rest of the project queryable. The snapshot is disposable;
-there is no maintained `context.json`. Static I/O locations also feed the
-existing compile-time debug map, while live values still come only from
-`plc_read` and `plc_verify`. Tree-sitter is for navigation; MatIEC and the
-OpenPLC test Runtime remain the syntax and behavior authorities. Existing
-check/compile tools still accept one ST file at a time. Set `--project-root`
-to one PLC project; the index includes all ST files below that root, including
-fixtures if the repository root is used.
-
-## Phase 4 local Web IDE
-
-The browser workbench uses React, TypeScript, Vite, and a locally bundled Monaco
-Editor. Python FastAPI serves a localhost HTTP/WebSocket gateway. It calls the
-existing `CodexPLCSession`, Phase 2 PLC adapter, and Phase 3 project index; the
-browser does not connect directly to the filesystem, compiler, or Runtime.
+命令行也可完成一个完整的仿真验证流程：
 
 ```powershell
-python -m pip install -r requirements-phase4.txt
+python main.py check examples/problem_001_solution.st
+python main.py run examples/problem_001_solution.st
+python main.py verify problems/problem_001/tests.json
+python main.py stop
+```
+
+查看 `verify` 输出中的 `passed`，并在结束时停止测试 Runtime。验证计划只覆盖其中明确列出的输入、输出和时间条件。当前构建接口一次处理一个 ST 文件；Live Ladder 是有限语法子集的只读视图。
+
+## 项目结构
+
+| 路径 | 职责 |
+| --- | --- |
+| `agent/` | Codex 会话、需求处理和有界修复流程 |
+| `plc_tools/` | 稳定的 PLC 工具和 MCP 接口 |
+| `runtime/` | MatIEC、Docker 和 OpenPLC 测试 Runtime 适配 |
+| `plc_context/` | 从 ST 源文件派生的工程静态索引 |
+| `web_ide/` | 本地 FastAPI HTTP/WebSocket 网关 |
+| `frontend/` | React、TypeScript、Vite 和 Monaco 工作台 |
+| `examples/`、`problems/` | 示例 ST 与行为验证计划 |
+| `docs/` | 架构、阶段验收和发布验证记录 |
+
+Agent 通过 `plc_tools/` 使用 PLC 能力，Runtime 实现细节留在 `runtime/`。工程索引是派生数据，ST 源文件始终是工程事实来源。
+
+## 验证状态与限制
+
+Phase 1–5 已有真实 Codex、MatIEC、OpenPLC 和浏览器验收记录。[发布验证](docs/release-validation.md)还记录了独立克隆安装、WebSocket 启动和五步仿真行为验证。最新工作台界面有[构建、前端测试和实际 Agent 界面检查](reference/ours/REPORT.md)；该界面提交尚未单独完成全新克隆的端到端验收。
+
+目前仅支持 MatIEC/OpenPLC **测试仿真环境**。行为正确性的结论仅适用于实际通过的测试计划；物理 PLC 操作、通用多文件编译和 Ladder 编辑均不在当前支持范围内。更多细节见 [架构说明](docs/architecture.md)和 [Phase 5 验收结果](docs/phase5-result.md)。
+
+## 开发检查
+
+```powershell
+python -m unittest discover -s tests -v
 cd frontend
-npm ci
+npm test
 npm run build
-cd ..
-python main.py web --workspace .
 ```
 
-Open `http://127.0.0.1:8765`. For Vite development, use the one-command entry
-`python main.py web --workspace . --dev` and open `http://127.0.0.1:5173`.
-The server binds only to `127.0.0.1`. It uses the configured MatIEC/OpenPLC
-test environment; physical PLC operations are unavailable. The Codex CLI must
-be installed and authenticated separately. Health reports service readiness,
-and a Codex turn can be interrupted from the Agent panel.
-
-If Codex is authenticated but a turn stalls after `thread.started` and
-`turn.started`, check outbound access to OpenAI. When this machine requires a
-local HTTP proxy, set `PLC_CODEX_PROXY=http://127.0.0.1:PORT` in `.env.local`
-and restart the Web IDE. This setting applies only to the Codex child process;
-the browser, PLC tools, and localhost Runtime keep their own connections.
-For automatic startup of an existing local proxy application, also set
-`PLC_CODEX_PROXY_EXECUTABLE="ABSOLUTE_PATH_TO_PROXY_EXECUTABLE"`. The gateway
-launches it only if the configured localhost proxy port is unavailable, then
-waits up to 10 seconds. It reuses the running proxy and leaves this shared
-application running when the Web IDE exits. An unavailable proxy produces a
-clear Agent error and leaves the editor usable. No system proxy settings are
-changed.
-
-The Web IDE has Files/PLC explorers, ST editing and save conflicts,
-compiler Problems, simulation Runtime and live variables, Codex event streaming,
-sessions, and before/after Changes. Terminal remains deferred. See
-[`docs/phase4-current-state.md`](docs/phase4-current-state.md) for the P1–P3
-inventory and [`docs/phase4-progress.md`](docs/phase4-progress.md) for verified
-P4 capabilities. The remaining ten-second auto-stop and compiler-error repair
-browser scenarios passed real Chromium/MatIEC/OpenPLC acceptance on 2026-10-01.
-
-## Phase 5 online debugger
-
-Watch, Variables and read-only Live Ladder now share one DebugSession and
-batch-read WebSocket updates. Stable scope/instance IDs, acknowledged Force /
-Unforce, Force Overview, bounded Trace with digital/numeric plots, summaries,
-and native Runtime program-hash checks support actual simulator debugging.
-Source changes and stale/offline observations disable live highlighting.
-See [the Phase 5 audit](docs/phase5-current-state.md) and
-[the result and acceptance report](docs/phase5-result.md).
-
-## Legacy M5 single-Agent bounded repair loop (inactive CLI path)
-
-The following material documents the former M5 implementation. Its CLI
-examples do not describe the active Codex entrypoint.
-
-M5 adds a PLC-specific variant of the vendored `smolagents.ToolCallingAgent`.
-The P1 flow first converts the natural-language request into a transient
-`RequirementSpec`. Missing addresses, timing, state, safety, or observable
-behavior become `open_questions`; complete requirements proceed to candidate
-generation. Candidates pass through a cheap `validate_candidate` preflight
-before the Runtime-consuming `evaluate_candidate` acceptance gate. A compiler
-pass or an LLM explanation alone never counts as success.
-
-The following install command is for historical M5 tests only. The vendored
-smolagents source is imported by the old test adapter, not installed as an
-active Agent dependency:
-
-```powershell
-python -m pip install -r requirements-m5.txt
-```
-
-Configure a real OpenAI-compatible tool-calling model without committing the
-credential:
-
-Copy `.env.example` to `.env.local`, then set the real model id, API key, and
-optional OpenAI-compatible endpoint. The `agent` command loads `.env.local`
-automatically. Existing process environment variables take precedence over
-file values.
-
-```dotenv
-PLC_AGENT_MODEL_ID=your-model-id
-PLC_AGENT_API_KEY=your-api-key
-PLC_AGENT_API_BASE=https://your-provider.example/v1
-```
-
-Alternatively, configure the same values in the current PowerShell session:
-
-```powershell
-$env:PLC_AGENT_MODEL_ID = "your-model-id"
-$env:PLC_AGENT_API_KEY = "your-api-key"
-$env:PLC_AGENT_API_BASE = "https://your-provider.example/v1" # optional
-```
-
-Run the bounded Agent through the CLI:
-
-```powershell
-python main.py agent "当 Start 为真且 Stop 为假时启动 Motor，Stop 为真时关闭 Motor"
-python main.py agent --max-attempts 3 --max-actions 8 "your PLC requirement"
-```
-
-若需求缺少 PLC 地址、按钮语义或安全/状态规则，交互式终端会显示 Agent
-提供的选项和“自定义填写”入口。选定或填写答案后，CLI 会在同一命令中把补充
-内容带入下一轮有界 Agent 运行。该续跑只允许发生在任何真实 PLC 候选评估之前，
-因此不会延长修复预算。默认终端输出是面向人的结果摘要、执行尝试和最终 ST；脚本
-和 CI 使用 `--json` 获得完整的单个 JSON 结果。非交互 stdin 也不会等待输入。
-
-`--requirement-file` reads a UTF-8 requirement from disk. `--output` saves only
-an accepted result: it writes the verified ST file and its matching
-`PROGRAM.tests.json` verification plan. Existing artifacts are protected until
-you add `--overwrite`:
-
-```powershell
-python main.py agent --requirement-file requirements/motor.txt --output artifacts/motor.st
-```
-
-The two budgets are independent. `max_attempts` counts only preflight-approved
-candidates that enter real Runtime evaluation. Requirement analysis, malformed
-tool arguments, empty ST, invalid verification plans, and MatIEC preflight
-diagnostics consume Agent actions but not Runtime attempts. `max_actions`
-bounds all model actions.
-
-P3 checks the configured model against the Agent's real tool schemas before
-starting a PLC task. This extra model request validates credentials, model
-availability, and tool calling without executing any PLC tool. The normal
-model calls use `tool_choice=auto`; reasoning is not disabled for DeepSeek.
-An endpoint that returns only prose to the tool probe fails early with
-`model_tool_unsupported`. Authentication, connection, context, and malformed
-tool-call errors retain distinct failure kinds. The verification plan uses
-`{"steps": [{"inputs": {...}, "expected": {...}, "settle_ms": 100}]}`;
-`settle_ms` waits after applying inputs, whereas optional `time_ms` is an
-absolute offset from the start of verification.
-
-P3 acceptance (2026-09-22): the configured real `deepseek-flash` endpoint
-passed the tool-schema probe, asked for missing I/O/timing details without
-starting Runtime, and then generated a complete Start/Stop program for an
-explicit requirement. The latter passed real MatIEC checking, OpenPLC
-compilation/start, seven behavior assertions, forced-input release, and Runtime
-stop in one evaluation attempt. The first candidate in this exercise timed
-out during MatIEC preflight; it was correctly reported as unverified and used
-zero Runtime attempts. A known ST sample subsequently passed the same MatIEC
-backend, and the corrected prompt led to the accepted candidate.
-
-P1 enforces this order:
-
-```text
-natural language -> RequirementSpec -> clarify or generate
-                 -> validate_candidate (real ST check, no Runtime)
-                 -> evaluate_candidate (compile/start/verify/stop)
-```
-
-The exact ST and verification plan accepted by preflight are cryptographically
-bound together. Changing either one requires a new preflight. The Runtime
-status check is host-owned, so a busy Runtime is rejected before compilation
-without consuming an evaluation attempt or stopping an existing program.
-
-P2 adds an optional in-process `PLCSession` API for callers that need multiple
-turns. It keeps the last verified ST/plan, `RequirementSpec`, recent real
-verification evidence, explicitly confirmed assumptions, and at most six short
-turn summaries. It does not store unbounded chat history or require a database.
-
-```python
-from agent import PLCSession
-
-session = PLCSession(on_event=lambda event: print(event.to_dict()))
-first = session.submit("Build a motor controller")
-second = session.resume("Start=%IX0.0, Stop=%IX0.1, Motor=%QX0.0")
-# A concurrent caller may request cooperative cancellation with session.cancel().
-```
-
-Progress events include requirement analysis, user waiting, candidate/check/
-compile/start/verification/repair stages, acceptance or failure, and cleanup.
-Cancellation is cooperative: the current external tool call may finish first;
-verification then releases forced variables and the Agent stops its Runtime.
-The existing one-shot `python main.py agent` JSON API is unchanged.
-
-P4 adds a process-local interactive terminal conversation:
-
-```powershell
-python main.py chat
-python main.py chat "Build a motor program; I/O addresses to follow"
-```
-
-`chat` resumes the same `PLCSession` after a clarification or a verified
-program edit. It prints live model/check/compile/run/verification/cleanup
-events, then a concise result, complete ST, verification plan, and real
-expected/actual evidence. Type `/json` for the last full machine result,
-`/metrics` for session counters, `/help`, or `/quit`. Ctrl+C during a turn
-requests cooperative cancellation and waits for Runtime cleanup; it does not
-abandon an active worker. The session is in memory only and ends with the
-process. Scripts and CI should continue using `python main.py agent --json`.
-
-P5 acceptance and the exact opt-in commands are recorded in
-[docs/p5-acceptance.md](docs/p5-acceptance.md). The in-process counters include
-first progress latency, grouped clarification count, rejected tool calls and
-schema errors, real Runtime attempts, repair success, continuation success,
-and cleanup success. A rate is `null` until its denominator is nonzero.
-
-The P0 control protocol also permits explicit non-success outcomes. The Agent
-can ask one grouped clarification question, report an unverifiable requirement,
-report a safe failure, or finish after the candidate budget is exhausted. Every
-JSON result includes a `state`; only an `accepted` state backed by real behavior
-verification has `success: true`.
-
-The real LLM and real OpenPLC acceptance test remains opt-in and requires
-`PLC_AGENT_INTEGRATION=1` together with `PLC_OPENPLC_INTEGRATION=1`. See
-[docs/m5-plan.md](docs/m5-plan.md) for the full contract and acceptance rules.
+默认 Python 测试中的真实集成场景可能被跳过；需要按对应文档配置 MatIEC/OpenPLC 测试环境后单独运行。历史 M5 测试还需要前述 Git 子模块。

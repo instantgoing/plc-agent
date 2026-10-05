@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+.venv/
 .plc-agent/
 .env.local
 frontend/node_modules/
