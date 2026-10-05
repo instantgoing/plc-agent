@@ -1,0 +1,7 @@
+# Active Codex, MCP, project context, and Web IDE dependencies.
+mcp>=2,<3
+tree-sitter==0.25.2
+tree-sitter-iec61131-3-st==0.1.2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+websockets>=15,<18

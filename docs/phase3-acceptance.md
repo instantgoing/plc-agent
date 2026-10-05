@@ -27,7 +27,8 @@ physical PLC operation was added.
 ## Parser Used
 
 `tree-sitter==0.25.2` and `tree-sitter-iec61131-3-st==0.1.2` are pinned in
-`requirements-phase3.txt`. The ST grammar provides AST nodes, source ranges,
+`requirements-phase3.txt` at the time; they are now in `requirements.txt`.
+The ST grammar provides AST nodes, source ranges,
 and error recovery. `plc_context/st_adapter.py` extracts only known nodes;
 MatIEC remains the compiler and OpenPLC remains the behavior authority.
 Parser references: [grammar repository](https://github.com/HeytalePazguato/tree-sitter-iec61131-3-st),

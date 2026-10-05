@@ -44,7 +44,8 @@ commit `30bb116` and had a clean Git status. Its default Python suite again ran
 
 Clone with `--recurse-submodules` for historical M5 tests. The active Web IDE
 does not import `smolagents`. Install Python dependencies from
-`requirements-phase4.txt`, install frontend dependencies with `npm ci`, and
+`requirements.txt` (the former `requirements-phase4.txt` dependency set),
+install frontend dependencies with `npm ci`, and
 build the frontend before `python main.py web --workspace <PLC-project>`.
 Real Runtime acceptance requires the pinned MatIEC/OpenPLC test environment;
 compiler success alone is not a behavior result. The opt-in browser scenarios

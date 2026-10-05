@@ -19,12 +19,12 @@ The project currently targets **local simulation and testing**. It cannot connec
 
 | Purpose | Requirements |
 | --- | --- |
-| Web IDE | Python 3, Node.js, and npm; install `requirements-phase4.txt` and frontend dependencies |
+| Web IDE | Python 3, Node.js, and npm; install `requirements.txt` and frontend dependencies |
 | ST checks | MatIEC `iec2c`, using the supplied Docker compiler image or a configured local/WSL compiler |
 | Simulation, debugging, and verification | Docker Engine, Docker Compose, and the project's pinned OpenPLC test Runtime; support for `linux/amd64` containers |
 | Agent | An installed and authenticated Codex CLI, with network access to its model service |
 
-Installing the Tree-sitter ST grammar from `requirements-phase4.txt` on Windows may require a C build toolchain. Image builds download pinned MatIEC, OpenPLC, and other dependencies. Real acceptance has run on a Windows host with Docker Linux containers; other host environments need their own validation.
+Installing the Tree-sitter ST grammar from `requirements.txt` on Windows may require a C build toolchain. Image builds download pinned MatIEC, OpenPLC, and other dependencies. Real acceptance has run on a Windows host with Docker Linux containers; other host environments need their own validation.
 
 ## Quick start
 
@@ -37,7 +37,7 @@ git clone https://github.com/instantgoing/plc-agent.git
 cd plc-agent
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-phase4.txt
+python -m pip install -r requirements.txt
 cd frontend
 npm ci
 npm run build
@@ -132,4 +132,4 @@ npm test
 npm run build
 ```
 
-Real integration scenarios in the default Python suite may be skipped. Configure the MatIEC/OpenPLC test environment and run them separately as documented. Historical M5 tests also require the Git submodule noted above.
+Real integration scenarios in the default Python suite may be skipped. Configure the MatIEC/OpenPLC test environment and run them separately as documented. Historical M5 tests also require the Git submodule noted above and the separate `requirements-m5.txt`.

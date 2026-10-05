@@ -19,12 +19,12 @@ PLC-Agent 是一个面向 IEC 61131-3 结构化文本（ST）的本地开发工�
 
 | 用途 | 所需环境 |
 | --- | --- |
-| Web IDE | Python 3、Node.js 与 npm；安装 `requirements-phase4.txt` 和前端依赖 |
+| Web IDE | Python 3、Node.js 与 npm；安装 `requirements.txt` 和前端依赖 |
 | ST 检查 | MatIEC `iec2c`，可使用项目提供的 Docker 编译器镜像，或配置本机/WSL 编译器 |
 | 仿真、调试和行为验证 | Docker Engine、Docker Compose，以及项目固定版本的 OpenPLC 测试 Runtime；需要支持 `linux/amd64` 容器 |
 | Agent | 已安装并认证的 Codex CLI，以及访问模型服务的网络连接 |
 
-Windows 安装 `requirements-phase4.txt` 中的 Tree-sitter ST 语法包时可能需要 C 编译工具链。镜像构建会下载固定版本的 MatIEC、OpenPLC 和其他依赖。项目曾在 Windows 主机及 Docker Linux 容器上完成真实验收；其他主机环境仍需自行验证。
+Windows 安装 `requirements.txt` 中的 Tree-sitter ST 语法包时可能需要 C 编译工具链。镜像构建会下载固定版本的 MatIEC、OpenPLC 和其他依赖。项目曾在 Windows 主机及 Docker Linux 容器上完成真实验收；其他主机环境仍需自行验证。
 
 ## 快速开始
 
@@ -37,7 +37,7 @@ git clone https://github.com/instantgoing/plc-agent.git
 cd plc-agent
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-phase4.txt
+python -m pip install -r requirements.txt
 cd frontend
 npm ci
 npm run build
@@ -132,4 +132,4 @@ npm test
 npm run build
 ```
 
-默认 Python 测试中的真实集成场景可能被跳过；需要按对应文档配置 MatIEC/OpenPLC 测试环境后单独运行。历史 M5 测试还需要前述 Git 子模块。
+默认 Python 测试中的真实集成场景可能被跳过；需要按对应文档配置 MatIEC/OpenPLC 测试环境后单独运行。历史 M5 测试还需要前述 Git 子模块及独立的 `requirements-m5.txt`。
